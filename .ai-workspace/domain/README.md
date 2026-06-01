@@ -2,7 +2,11 @@
 
 本目录存放 MeuMall 的业务领域模型。领域模型用于统一商品、SKU、购物车、订单、用户等概念，避免 H5、server、admin 和原生壳各自定义一套说法。
 
-## 建议优先补齐
+## 已建立领域规则
+
+1. `ecommerce-data-consistency.md`
+
+## 建议继续补齐
 
 1. `product.md`
 2. `sku.md`

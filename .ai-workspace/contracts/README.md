@@ -2,12 +2,17 @@
 
 本目录存放 MeuMall 跨项目契约入口。项目内更详细的 API 文档可以保留在各自 `docs/` 中，但不能与这里的根级契约冲突。
 
-## 建议优先补齐
+## 已建立契约
+
+1. `hybrid-h5-runtime-contract.md`
+2. `h5-cache-contract.md`
+3. `native-bridge-lifecycle-contract.md`
+
+## 建议继续补齐
 
 1. `manifest-contract.md`
 2. `release-api-contract.md`
-3. `native-bridge-contract.md`
-4. `h5-server-api-contract.md`
+3. `h5-server-api-contract.md`
 
 ## 契约变更要求
 

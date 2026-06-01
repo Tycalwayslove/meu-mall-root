@@ -30,6 +30,7 @@
 - `templates/TASK.md`：工作项模板。
 - `contracts/`：跨项目契约文档入口。
 - `domain/`：业务领域模型文档入口。
+- `tasks/`：根级或跨项目工作项入口。
 
 ## 基本原则
 
@@ -38,6 +39,14 @@
 - 没有验收记录，不声称完成。
 - 没有发布影响说明，不进入上线或灰度。
 - 跨项目变更先写契约，再写实现。
+
+## 已纳入的业务治理规则
+
+- `contracts/hybrid-h5-runtime-contract.md`：Hybrid H5 运行时、WebView 复用、构建产物边界和发布顺序。
+- `contracts/h5-cache-contract.md`：H5 静态资源、HTML、Service Worker、API 和登录态缓存边界。
+- `contracts/native-bridge-lifecycle-contract.md`：Native 与 H5 的生命周期事件、能力检测和安全边界。
+- `domain/ecommerce-data-consistency.md`：电商数据的一致性等级、缓存位置和交易限制。
+- `tasks/hybrid-h5-cache-runtime-backlog.md`：后续可拆分执行的缓存与运行时任务候选池。
 
 ## 根级命令
 
