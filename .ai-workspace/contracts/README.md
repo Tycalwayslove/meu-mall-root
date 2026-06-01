@@ -7,6 +7,7 @@
 1. `hybrid-h5-runtime-contract.md`
 2. `h5-cache-contract.md`
 3. `native-bridge-lifecycle-contract.md`
+4. `homepage-config-contract.md`
 
 ## 建议继续补齐
 
