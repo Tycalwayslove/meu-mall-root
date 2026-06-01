@@ -2,7 +2,7 @@
 
 ## 状态
 
-ready
+verified
 
 ## 目标
 
@@ -94,23 +94,31 @@ ready
 ## 验证命令
 
 ```bash
-# server-meumall
 cd /Users/mac/person_code/meu-mall/server-meumall
-pytest
+.venv/bin/python -m pytest tests/test_api.py -k "home_config" -v
+.venv/bin/python -m pytest
 
-# admin-meumall
 cd /Users/mac/person_code/meu-mall/admin-meumall
+pnpm test -- src/lib/configApi.test.ts
 pnpm test
-pnpm typecheck
+pnpm exec tsc -b
 pnpm build
 
-# hybird-meumall
 cd /Users/mac/person_code/meu-mall/hybird-meumall
+pnpm test -- src/features/home/home.test.tsx
 pnpm test
 pnpm typecheck
 pnpm lint
 pnpm build
 ```
+
+## 验证结果
+
+- `server-meumall`：首页配置专项测试 4 passed，全量 pytest 14 passed。
+- `admin-meumall`：`configApi` 测试 9 passed，全量测试 9 passed，`pnpm exec tsc -b` 通过，`pnpm build` 通过。
+- `hybird-meumall`：Vitest 12 files / 72 tests 通过，`typecheck`、`lint`、`build` 通过。
+- smoke：发布 `2026.06.01-smoke` 首页配置后，`http://localhost:3000/` 展示接口下发的 `Smoke 首页配置`、`配置分类` 和 `配置活动`。
+- 管理端 smoke：`http://localhost:5173/` 点击“内容配置”可进入首页配置页，并展示列表、模块摘要和配置 JSON。
 
 ## 发布影响
 
@@ -131,3 +139,5 @@ pnpm build
 | 日期 | 状态 | 说明 |
 | --- | --- | --- |
 | 2026-06-01 | ready | 用户确认首页配置生产化方案，创建 ready 工作项。 |
+| 2026-06-01 | in_progress | 按实现计划启动后端、管理端和 H5 三线并行开发。 |
+| 2026-06-01 | verified | 后端、管理端、H5 自动化验证和本地 smoke 均通过。 |
