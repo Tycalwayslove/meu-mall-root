@@ -1,10 +1,11 @@
 # 业务领域模型目录
 
-本目录存放 MeuMall 的业务领域模型。领域模型用于统一商品、SKU、购物车、订单、用户等概念，避免 H5、server、admin 和原生壳各自定义一套说法。
+本目录存放 MeuMall 的业务领域模型。领域模型用于统一商品、店铺、推广、达人、佣金、智能体、会员、购买记录等概念，避免 H5、server、admin 和原生壳各自定义一套说法。
 
 ## 已建立领域规则
 
 1. `ecommerce-data-consistency.md`
+2. `meumall-business-model.md`
 
 ## 建议继续补齐
 
