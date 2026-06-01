@@ -1,0 +1,20 @@
+# Nested project repositories
+/admin-meumall/
+/app-meumall/
+/hybird-meumall/
+/meumall-ci/
+/server-meumall/
+
+# Local OS/editor files
+.DS_Store
+*.swp
+*.swo
+
+# Local environment and logs
+.env
+.env.*
+*.log
+
+# Generated caches
+.cache/
+.tmp/
