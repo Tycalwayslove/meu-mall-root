@@ -20,6 +20,12 @@
 2. `.ai-workspace/RELEASE_GOVERNANCE.md`
 3. 相关子项目的 `AGENTS.md`
 
+如果任务涉及产品页面、业务规则、端归属、登录、交易、推广、会员/达人或智能体，还必须读取：
+
+1. `.ai-workspace/product/product-decisions.md`
+2. `.ai-workspace/product/page-inventory.md`
+3. `.ai-workspace/domain/meumall-business-model.md`
+
 ## 工作区原则
 
 - 根目录负责统一 AI 工作机制，不承载具体业务实现。

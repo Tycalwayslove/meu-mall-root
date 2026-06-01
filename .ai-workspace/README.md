@@ -48,6 +48,8 @@
 - `contracts/native-bridge-lifecycle-contract.md`：Native 与 H5 的生命周期事件、能力检测和安全边界。
 - `domain/ecommerce-data-consistency.md`：电商数据的一致性等级、缓存位置和交易限制。
 - `tasks/hybrid-h5-cache-runtime-backlog.md`：后续可拆分执行的缓存与运行时任务候选池。
+- `product/product-decisions.md`：已确认的喵呜产品决策记录。
+- `product/page-inventory.md`：基于 Figma 的页面盘点和端归属草案。
 
 ## 根级命令
 

@@ -44,7 +44,7 @@ Native Bridge Lifecycle Contract
 | `switchTab` | H5 | 请求原生切换一级 tab |
 | `openPage` | H5 | 请求原生打开二级页面 |
 | `closePage` | H5 | 请求关闭当前页面 |
-| `updateCartBadge` | H5 | 更新购物车角标 |
+| `updateBadge` | H5 | 更新消息、推广、我的等业务角标 |
 | `needLogin` | H5 | 请求原生登录流程 |
 | `showToast` | H5 | 请求原生提示 |
 | `reportError` | H5 | 上报 H5 错误 |
@@ -95,7 +95,7 @@ H5 不得保存：
 
 - 原生发送 `loginStateChanged`。
 - H5 刷新用户相关模块。
-- 购物车和我的页面重新请求真实数据。
+- 首页、推广、我的、会员/达人、订单或购买记录等页面重新请求真实数据。
 
 退出登录：
 
