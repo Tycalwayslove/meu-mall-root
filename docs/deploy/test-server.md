@@ -12,6 +12,7 @@
 - H5：`http://hybird.aigcpop.com/`
 - 管理后台：`http://hybird.aigcpop.com/admin/`
 - 后端健康检查：`http://hybird.aigcpop.com/api/health`
+- HTTPS H5：`https://hybird.aigcpop.com/`
 
 宿主机只暴露 Nginx 对外入口。Docker 服务绑定在 `127.0.0.1`：
 
@@ -107,6 +108,20 @@ deploy/nginx/hybird.aigcpop.com.conf
 ```
 
 脚本只新增或覆盖这个单独的 Meu Mall 配置文件，不修改服务器上其他 Nginx 配置。
+
+服务器上 443 端口由既有的 `mall4j-nginx` 容器以 host 网络模式占用。为了避免浏览器因 HSTS 自动升级到 HTTPS 后落入 Mall4j 默认站点，部署脚本会在检测到 `mall4j-nginx` 时额外写入：
+
+```text
+/opt/mail4j/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf
+```
+
+源配置文件在仓库中：
+
+```text
+deploy/nginx/hybird.aigcpop.com.ssl.conf
+```
+
+这份 HTTPS 配置只新增 `hybird.aigcpop.com` server，不修改 `mall.aigcpop.com`、`shop.aigcpop.com`、`platform.aigcpop.com` 等既有 Mall4j 域名。
 
 ## Docker Compose
 

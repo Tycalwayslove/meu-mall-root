@@ -192,6 +192,14 @@ else
   echo 'nginx command not found on host; skipped nginx reload.' >&2
   exit 20
 fi
+
+if docker ps --format '{{.Names}}' | grep -qx 'mall4j-nginx' && [ -d '/opt/mail4j/nginx/conf.d' ]; then
+  cp '${REMOTE_PATH}/deploy/nginx/hybird.aigcpop.com.ssl.conf' '/opt/mail4j/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
+  docker exec mall4j-nginx nginx -t
+  docker exec mall4j-nginx nginx -s reload
+else
+  echo 'mall4j-nginx HTTPS entry not found; skipped HTTPS site install.' >&2
+fi
 REMOTE
 }
 
@@ -219,6 +227,7 @@ curl -fsS --max-time 10 http://127.0.0.1:4100/api/health >/dev/null
 curl -fsS --max-time 10 http://127.0.0.1:3109/api/health >/dev/null
 curl -fsS --max-time 10 -H 'Host: ${DOMAIN}' http://127.0.0.1/ >/dev/null
 curl -fsS --max-time 10 -H 'Host: ${DOMAIN}' http://127.0.0.1/admin/ >/dev/null
+curl -kfsS --max-time 10 https://${DOMAIN}/api/health >/dev/null
 echo 'remote smoke passed'
 REMOTE
 }
