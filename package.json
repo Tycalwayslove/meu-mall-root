@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "bash scripts/root/dev-all.sh",
     "dev:server": "cd server-meumall && . .venv/bin/activate && python3 -m uvicorn app.main:app --host 127.0.0.1 --port 4100 --reload",
-    "dev:h5": "cd hybird-meumall && H5_BASE_PATH=/hybird H5_MANIFEST_URL=http://127.0.0.1:4100/api/h5/manifest/active?environment=prod NEXT_PUBLIC_H5_MANIFEST_URL=http://127.0.0.1:4100/api/h5/manifest/active?environment=prod pnpm dev -- -p 3109",
-    "dev:admin": "cd admin-meumall && pnpm dev -- --host 127.0.0.1 --port 5173",
+    "dev:h5": "cd hybird-meumall && H5_BASE_PATH=/hybird H5_MANIFEST_URL=http://127.0.0.1:4100/api/h5/manifest/active?environment=prod NEXT_PUBLIC_H5_MANIFEST_URL=http://127.0.0.1:4100/api/h5/manifest/active?environment=prod NEXT_PUBLIC_CONFIG_API_BASE_URL=http://127.0.0.1:4100 pnpm exec next dev -H localhost -p 3109",
+    "dev:admin": "cd admin-meumall && VITE_CONFIG_API_BASE_URL=http://127.0.0.1:4100 pnpm dev -- --host localhost --port 5173",
+    "test:dev-script": "bash scripts/root/dev-lib.test.sh",
     "check": "bash scripts/root/check-all.sh",
     "check:workflow": "bash scripts/root/check-all.sh",
     "check:h5": "cd hybird-meumall && pnpm run ai:check-workflow",
