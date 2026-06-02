@@ -47,6 +47,14 @@ SSH_KEY=/path/to/key.pem npm run deploy:test-server
 
 ## Jenkins 部署
 
+启动本地 Jenkins：
+
+```bash
+npm run ci:jenkins
+```
+
+这个命令会先把整站部署 Pipeline 同步到本地 Jenkins 挂载目录，然后启动 Jenkins 和 Mac agent。
+
 Pipeline 文件：
 
 ```text
@@ -63,6 +71,25 @@ credentialsId: meu-mall-test-server-password
 
 ```bash
 bash scripts/deploy/test-server-deploy.sh
+```
+
+Jenkins 启动后访问：
+
+```text
+http://127.0.0.1:8082
+```
+
+默认登录信息：
+
+```text
+用户：meumall
+密码：meumall-local-2026
+```
+
+整站测试部署任务：
+
+```text
+meu-mall-test-server-deploy
 ```
 
 ## Nginx
