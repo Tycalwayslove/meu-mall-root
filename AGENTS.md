@@ -20,6 +20,12 @@
 2. `.ai-workspace/RELEASE_GOVERNANCE.md`
 3. 相关子项目的 `AGENTS.md`
 
+如果任务涉及 H5 需求开发、跨端对接、后端接口申请、原生 App 能力、管理后台配置或联调，还必须读取：
+
+1. `.ai-workspace/H5_DEMAND_INTEGRATION_WORKFLOW.md`
+2. `.ai-workspace/templates/INTEGRATION_BRIEF.md`
+3. 相关契约模板或契约文档
+
 如果任务涉及产品页面、业务规则、端归属、登录、交易、推广、会员/达人或智能体，还必须读取：
 
 1. `.ai-workspace/product/product-decisions.md`
@@ -32,6 +38,7 @@
 - 子项目负责各自代码、项目状态、测试报告和项目内决策。
 - 跨项目任务必须有工作项。
 - 跨项目接口必须有契约。
+- 跨端 H5 需求必须有对接说明。
 - 没有 `ready` 状态，不开始正式实现。
 - 没有验证记录，不声称完成。
 
