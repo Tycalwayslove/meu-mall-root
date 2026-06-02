@@ -138,6 +138,18 @@ cd /opt/mail4j/meu-mall
 docker compose -f deploy/docker-compose.test.yml down
 ```
 
+## 远端目录边界
+
+`/opt/mail4j/meu-mall` 是测试服务器部署目录，不是完整源码仓库。部署脚本会先在本地生成一个最小发布包，再同步到服务器：
+
+- 保留：`deploy/docker-compose.test.yml`、`deploy/docker/`、`deploy/nginx/`、`scripts/deploy/test-server-deploy.sh`。
+- 保留：`hybird-meumall` 构建所需的 `package.json`、`pnpm-lock.yaml`、配置文件、`src/` 和 `public/`。
+- 保留：`admin-meumall` 构建所需的 `package.json`、`pnpm-lock.yaml`、配置文件和 `src/`。
+- 保留：`server-meumall` 运行所需的 `requirements.txt` 和 `app/`。
+- 不同步：`.ai-workspace/`、`docs/`、`app-meumall/`、`meumall-ci/`、子项目 AI 文档、本地缓存、构建产物和日志。
+
+这样服务器目录只承担 Docker 构建和测试运行职责，Jenkins、原生 App、长期 AI 工作区文档仍留在本地仓库中管理。
+
 ## 数据
 
 后端 SQLite 数据挂载在：

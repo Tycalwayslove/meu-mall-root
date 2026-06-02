@@ -12,6 +12,14 @@ INSTALL_NGINX="${INSTALL_NGINX:-true}"
 RUN_REMOTE_SMOKE="${RUN_REMOTE_SMOKE:-true}"
 SSH_KEY="${SSH_KEY:-}"
 SERVER_PASSWORD="${SERVER_PASSWORD:-}"
+SYNC_DIR=""
+
+cleanup_local() {
+  if [ -n "${SYNC_DIR}" ] && [ -d "${SYNC_DIR}" ]; then
+    rm -rf "${SYNC_DIR}"
+  fi
+}
+trap cleanup_local EXIT
 
 if [ -z "${SSH_KEY}" ] && [ -z "${SERVER_PASSWORD}" ]; then
   printf "SSH user [%s]: " "${REMOTE_USER}"
@@ -75,21 +83,90 @@ run_ssh() {
     expect_password
 }
 
+copy_file_if_exists() {
+  local source_path="$1"
+  local target_path="$2"
+
+  if [ -f "${ROOT_DIR}/${source_path}" ]; then
+    mkdir -p "${SYNC_DIR}/$(dirname "${target_path}")"
+    cp "${ROOT_DIR}/${source_path}" "${SYNC_DIR}/${target_path}"
+  fi
+}
+
+copy_dir_if_exists() {
+  local source_path="$1"
+  local target_path="$2"
+
+  if [ -d "${ROOT_DIR}/${source_path}" ]; then
+    mkdir -p "${SYNC_DIR}/$(dirname "${target_path}")"
+    rsync -a --delete \
+      --exclude=node_modules \
+      --exclude=.next \
+      --exclude=dist \
+      --exclude=.venv \
+      --exclude=.pytest_cache \
+      --exclude=__pycache__ \
+      --exclude=.DS_Store \
+      --exclude='*.log' \
+      "${ROOT_DIR}/${source_path}/" \
+      "${SYNC_DIR}/${target_path}/"
+  fi
+}
+
+prepare_sync_bundle() {
+  SYNC_DIR="$(mktemp -d)"
+
+  copy_file_if_exists ".dockerignore" ".dockerignore"
+  copy_file_if_exists "package.json" "package.json"
+
+  copy_file_if_exists "deploy/docker-compose.test.yml" "deploy/docker-compose.test.yml"
+  copy_dir_if_exists "deploy/docker" "deploy/docker"
+  copy_dir_if_exists "deploy/nginx" "deploy/nginx"
+
+  copy_file_if_exists "scripts/deploy/test-server-deploy.sh" "scripts/deploy/test-server-deploy.sh"
+
+  copy_file_if_exists "admin-meumall/package.json" "admin-meumall/package.json"
+  copy_file_if_exists "admin-meumall/pnpm-lock.yaml" "admin-meumall/pnpm-lock.yaml"
+  copy_file_if_exists "admin-meumall/index.html" "admin-meumall/index.html"
+  copy_file_if_exists "admin-meumall/tsconfig.json" "admin-meumall/tsconfig.json"
+  copy_file_if_exists "admin-meumall/tsconfig.app.json" "admin-meumall/tsconfig.app.json"
+  copy_file_if_exists "admin-meumall/tsconfig.node.json" "admin-meumall/tsconfig.node.json"
+  copy_file_if_exists "admin-meumall/vite.config.ts" "admin-meumall/vite.config.ts"
+  copy_dir_if_exists "admin-meumall/src" "admin-meumall/src"
+
+  copy_file_if_exists "hybird-meumall/package.json" "hybird-meumall/package.json"
+  copy_file_if_exists "hybird-meumall/pnpm-lock.yaml" "hybird-meumall/pnpm-lock.yaml"
+  copy_file_if_exists "hybird-meumall/next.config.ts" "hybird-meumall/next.config.ts"
+  copy_file_if_exists "hybird-meumall/next-env.d.ts" "hybird-meumall/next-env.d.ts"
+  copy_file_if_exists "hybird-meumall/tsconfig.json" "hybird-meumall/tsconfig.json"
+  copy_file_if_exists "hybird-meumall/tailwind.config.ts" "hybird-meumall/tailwind.config.ts"
+  copy_file_if_exists "hybird-meumall/postcss.config.js" "hybird-meumall/postcss.config.js"
+  copy_file_if_exists "hybird-meumall/eslint.config.mjs" "hybird-meumall/eslint.config.mjs"
+  copy_file_if_exists "hybird-meumall/vitest.config.ts" "hybird-meumall/vitest.config.ts"
+  copy_dir_if_exists "hybird-meumall/public" "hybird-meumall/public"
+  copy_dir_if_exists "hybird-meumall/src" "hybird-meumall/src"
+
+  copy_file_if_exists "server-meumall/requirements.txt" "server-meumall/requirements.txt"
+  copy_dir_if_exists "server-meumall/app" "server-meumall/app"
+}
+
 run_rsync() {
   local rsync_command
 
+  prepare_sync_bundle
+
   rsync_command="$(
     printf 'rsync -az --delete %s %q %q' \
-      "--exclude=.git --exclude=node_modules --exclude=.next --exclude=dist --exclude=.venv --exclude=.pytest_cache --exclude=__pycache__ --exclude=runtime --exclude=data --exclude=.DS_Store --exclude=*.log -e \"ssh -p ${REMOTE_PORT} -o StrictHostKeyChecking=accept-new\"" \
-      "${ROOT_DIR}/" \
+      "--exclude=runtime --exclude=data --exclude=.DS_Store --exclude=*.log -e \"ssh -p ${REMOTE_PORT} -o StrictHostKeyChecking=accept-new\"" \
+      "${SYNC_DIR}/" \
       "${SSH_TARGET}:${REMOTE_PATH}/"
   )"
 
   if [ -n "${SSH_KEY}" ]; then
     rsync_command="$(
       printf 'rsync -az --delete %s %q %q' \
-        "--exclude=.git --exclude=node_modules --exclude=.next --exclude=dist --exclude=.venv --exclude=.pytest_cache --exclude=__pycache__ --exclude=runtime --exclude=data --exclude=.DS_Store --exclude=*.log -e \"ssh -i ${SSH_KEY} -p ${REMOTE_PORT} -o StrictHostKeyChecking=accept-new\"" \
-        "${ROOT_DIR}/" \
+        "--exclude=runtime --exclude=data --exclude=.DS_Store --exclude=*.log -e \"ssh -i ${SSH_KEY} -p ${REMOTE_PORT} -o StrictHostKeyChecking=accept-new\"" \
+        "${SYNC_DIR}/" \
         "${SSH_TARGET}:${REMOTE_PATH}/"
     )"
   fi
