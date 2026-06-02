@@ -20,7 +20,7 @@
     "ci:stop": "bash meumall-ci/ops/stop-all.sh",
     "ci:jenkins": "bash scripts/jenkins/start-local.sh",
     "deploy:test-server": "bash scripts/deploy/test-server-deploy.sh",
-    "deploy": "bash meumall-ci/ops/hybird-local-deploy.sh",
-    "deploy:h5": "bash meumall-ci/ops/hybird-local-deploy.sh"
+    "deploy": "bash scripts/deploy/test-server-deploy.sh",
+    "deploy:h5": "bash scripts/deploy/test-server-deploy.sh"
   }
 }
