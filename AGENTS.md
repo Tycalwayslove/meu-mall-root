@@ -26,6 +26,11 @@
 2. `.ai-workspace/templates/INTEGRATION_BRIEF.md`
 3. 相关契约模板或契约文档
 
+如果任务是把自然语言需求整理成 AI 可执行需求、工作项、对接说明或契约清单，优先使用本地 Codex skill：
+
+1. `meumall-requirement-shaper`
+2. 说明文档：`.ai-workspace/skills/meumall-requirement-shaper.md`
+
 如果任务涉及产品页面、业务规则、端归属、登录、交易、推广、会员/达人或智能体，还必须读取：
 
 1. `.ai-workspace/product/product-decisions.md`

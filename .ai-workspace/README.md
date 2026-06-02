@@ -36,6 +36,7 @@
 - `templates/NATIVE_BRIDGE_CONTRACT.md`：H5 与原生 Bridge 契约模板。
 - `templates/ADMIN_CONFIG_CONTRACT.md`：H5 与后台配置契约模板。
 - `templates/COUNTERPART_HANDOFF.md`：给后端、原生 App、管理后台、测试/发布的对外输出包模板。
+- `skills/`：本项目推荐使用的本地 Codex skill 说明。
 - `contracts/`：跨项目契约文档入口。
 - `integration-briefs/`：H5 需求对接说明入口。
 - `domain/`：业务领域模型文档入口。
