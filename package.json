@@ -21,6 +21,7 @@
     "ci:jenkins": "bash scripts/jenkins/start-local.sh",
     "deploy:test-server": "bash scripts/deploy/test-server-deploy.sh",
     "deploy": "bash scripts/deploy/test-server-deploy.sh",
-    "deploy:h5": "bash scripts/deploy/test-server-deploy.sh"
+    "deploy:h5": "bash scripts/deploy/h5-version-deploy.sh",
+    "deploy:h5-version": "bash scripts/deploy/h5-version-deploy.sh"
   }
 }

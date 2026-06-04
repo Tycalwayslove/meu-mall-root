@@ -11,6 +11,8 @@ mkdir -p "${CI_HOME}/jenkins/pipelines"
 rm -f "${CI_HOME}/jenkins/pipelines/hybird-meumall-local-deploy.groovy"
 cp "${ROOT_DIR}/deploy/jenkins/meu-mall-test-server-deploy.groovy" \
   "${CI_HOME}/jenkins/pipelines/meu-mall-test-server-deploy.groovy"
+cp "${ROOT_DIR}/deploy/jenkins/meu-mall-h5-version-deploy.groovy" \
+  "${CI_HOME}/jenkins/pipelines/meu-mall-h5-version-deploy.groovy"
 
 "${CI_HOME}/ops/start-all.sh"
 
@@ -43,6 +45,7 @@ const crumb = await crumbRes.json();
 const script = String.raw`
 import hudson.model.BooleanParameterDefinition
 import hudson.model.ParametersDefinitionProperty
+import hudson.model.PasswordParameterDefinition
 import hudson.model.StringParameterDefinition
 import jenkins.model.Jenkins
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
@@ -59,6 +62,10 @@ def pipelineFile = new File('/var/jenkins_home/pipelines/meu-mall-test-server-de
 if (!pipelineFile.exists()) {
   throw new RuntimeException('Pipeline file not found: ' + pipelineFile.path)
 }
+def h5VersionPipelineFile = new File('/var/jenkins_home/pipelines/meu-mall-h5-version-deploy.groovy')
+if (!h5VersionPipelineFile.exists()) {
+  throw new RuntimeException('Pipeline file not found: ' + h5VersionPipelineFile.path)
+}
 
 def job = instance.getItem('meu-mall-test-server-deploy')
 if (job == null) {
@@ -72,13 +79,39 @@ job.addProperty(new ParametersDefinitionProperty([
   new StringParameterDefinition('REMOTE_PORT', '22', 'SSH 端口'),
   new StringParameterDefinition('REMOTE_PATH', '/opt/mail4j/meu-mall', '远端部署目录'),
   new StringParameterDefinition('DOMAIN', 'hybird.aigcpop.com', 'H5 测试域名'),
+  new PasswordParameterDefinition('SERVER_PASSWORD', '', '测试服务器 SSH 密码'),
   new BooleanParameterDefinition('INSTALL_NGINX', true, '是否安装并 reload Nginx 站点配置'),
   new BooleanParameterDefinition('RUN_REMOTE_SMOKE', true, '是否执行远端 smoke check')
 ]))
 job.setConcurrentBuild(false)
 job.save()
+
+def h5VersionJob = instance.getItem('meu-mall-h5-version-deploy')
+if (h5VersionJob == null) {
+  h5VersionJob = instance.createProject(WorkflowJob, 'meu-mall-h5-version-deploy')
+}
+h5VersionJob.setDefinition(new CpsFlowDefinition(h5VersionPipelineFile.text, true))
+h5VersionJob.removeProperty(ParametersDefinitionProperty)
+h5VersionJob.addProperty(new ParametersDefinitionProperty([
+  new StringParameterDefinition('GIT_REF', '', 'H5 Git ref；留空则使用 h5/v{hybird-meumall/package.json version}'),
+  new StringParameterDefinition('REMOTE_HOST', '8.163.107.208', '测试服务器 IP'),
+  new StringParameterDefinition('REMOTE_USER', 'root', 'SSH 用户'),
+  new StringParameterDefinition('REMOTE_PORT', '22', 'SSH 端口'),
+  new StringParameterDefinition('REMOTE_PATH', '/opt/mail4j/meu-mall', '远端部署目录'),
+  new StringParameterDefinition('DOMAIN', 'hybird.aigcpop.com', 'H5 测试域名'),
+  new StringParameterDefinition('H5_HOST_PORT', '', '宿主机端口；留空则自动选择 3200-3299'),
+  new StringParameterDefinition('NEXT_PUBLIC_H5_ASSET_BASE_URL', '', 'CDN 资源根地址；当前可留空'),
+  new PasswordParameterDefinition('SERVER_PASSWORD', '', '测试服务器 SSH 密码'),
+  new BooleanParameterDefinition('REGISTER_RELEASE', true, '是否注册 candidate release'),
+  new BooleanParameterDefinition('PROMOTE_RELEASE', false, '是否注册后立即提升为 active'),
+  new BooleanParameterDefinition('INSTALL_NGINX', true, '是否写入版本 nginx location 并 reload'),
+  new BooleanParameterDefinition('RUN_REMOTE_SMOKE', true, '是否执行版本 URL smoke check')
+]))
+h5VersionJob.setConcurrentBuild(false)
+h5VersionJob.save()
 instance.save()
 println('synced meu-mall-test-server-deploy')
+println('synced meu-mall-h5-version-deploy')
 `;
 
 const response = await fetch(`${base}/scriptText`, {
@@ -126,7 +159,9 @@ Jenkins 已启动：
 用于测试服务器整站部署的任务：
 - meu-mall-test-server-deploy
 
-如果这台机器还没有配置测试服务器凭据，请在 Jenkins 凭据里添加 Secret Text：
-- ID: meu-mall-test-server-password
-- Secret: 测试服务器 SSH 密码
+用于 H5 多版本容器发布的任务：
+- meu-mall-h5-version-deploy
+
+运行 job 时请在参数中填写：
+- SERVER_PASSWORD: 测试服务器 SSH 密码
 EOF

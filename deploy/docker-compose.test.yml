@@ -29,6 +29,8 @@ services:
       dockerfile: deploy/docker/h5.Dockerfile
       args:
         H5_BASE_PATH: ""
+        H5_VERSION: ${H5_VERSION:-local}
+        H5_RELEASE_LABEL: ${H5_RELEASE_LABEL:-local}
         NEXT_PUBLIC_CONFIG_API_BASE_URL: /
         NEXT_PUBLIC_H5_MANIFEST_URL: /api/h5/manifest/active?environment=prod
         H5_MANIFEST_URL: http://server:4100/api/h5/manifest/active?environment=prod
@@ -37,6 +39,9 @@ services:
     environment:
       PORT: 3109
       HOSTNAME: 0.0.0.0
+      H5_VERSION: ${H5_VERSION:-local}
+      H5_RELEASE_LABEL: ${H5_RELEASE_LABEL:-local}
+      H5_RELEASE_VARIANT: ${H5_RELEASE_VARIANT:-green}
     depends_on:
       server:
         condition: service_healthy

@@ -8,6 +8,9 @@ REMOTE_USER="${REMOTE_USER:-root}"
 REMOTE_PORT="${REMOTE_PORT:-22}"
 REMOTE_PATH="${REMOTE_PATH:-/opt/mail4j/meu-mall}"
 DOMAIN="${DOMAIN:-hybird.aigcpop.com}"
+H5_VERSION="${H5_VERSION:-$(date +%Y.%m.%d-%H%M)}"
+H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-${H5_VERSION}}"
+H5_RELEASE_VARIANT="${H5_RELEASE_VARIANT:-green}"
 INSTALL_NGINX="${INSTALL_NGINX:-true}"
 RUN_REMOTE_SMOKE="${RUN_REMOTE_SMOKE:-true}"
 SSH_KEY="${SSH_KEY:-}"
@@ -185,6 +188,7 @@ remote_nginx_command() {
   cat <<REMOTE
 set -euo pipefail
 if command -v nginx >/dev/null 2>&1; then
+  mkdir -p '/etc/nginx/conf.d/meu-mall-h5-versions'
   cp '${REMOTE_PATH}/deploy/nginx/hybird.aigcpop.com.conf' '/etc/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
   nginx -t
   nginx -s reload || systemctl reload nginx || service nginx reload
@@ -194,6 +198,7 @@ else
 fi
 
 if docker ps --format '{{.Names}}' | grep -qx 'mall4j-nginx' && [ -d '/opt/mail4j/nginx/conf.d' ]; then
+  mkdir -p '/opt/mail4j/nginx/conf.d/meu-mall-h5-versions'
   cp '${REMOTE_PATH}/deploy/nginx/hybird.aigcpop.com.ssl.conf' '/opt/mail4j/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
   docker exec mall4j-nginx nginx -t
   docker exec mall4j-nginx nginx -s reload
@@ -216,7 +221,7 @@ else
   echo 'docker compose is not available on remote server.' >&2
   exit 21
 fi
-\${COMPOSE} -f deploy/docker-compose.test.yml up -d --build
+H5_VERSION='${H5_VERSION}' H5_RELEASE_LABEL='${H5_RELEASE_LABEL}' H5_RELEASE_VARIANT='${H5_RELEASE_VARIANT}' \${COMPOSE} -f deploy/docker-compose.test.yml up -d --build
 REMOTE
 }
 
@@ -236,6 +241,7 @@ echo "== Meu Mall test-server deploy =="
 echo "Remote: ${SSH_TARGET}:${REMOTE_PORT}"
 echo "Path:   ${REMOTE_PATH}"
 echo "Domain: ${DOMAIN}"
+echo "H5 version: ${H5_VERSION}"
 
 echo "== Bootstrap remote path =="
 run_ssh "$(remote_bootstrap_command)"
