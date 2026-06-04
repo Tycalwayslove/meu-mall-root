@@ -8,9 +8,12 @@
 2. `h5-cache-contract.md`
 3. `native-bridge-lifecycle-contract.md`
 4. `homepage-config-contract.md`
-5. `api/`：H5 与后端业务 API 契约目录。
-6. `native-bridge/`：H5 与原生 App Bridge 具体能力契约目录。
-7. `admin-config/`：H5 与管理后台配置契约目录。
+5. `h5-native-route-contract.md`
+6. `native-bridge/meumall-bridge-protocol.md`：MeuMall H5 与原生 App Bridge 总协议草案。
+7. `api/promotion-bff-mock-contract.md`：推广模块首批 H5 页面 BFF mock 契约。
+8. `api/`：H5 与后端业务 API 契约目录。
+9. `native-bridge/`：H5 与原生 App Bridge 具体能力契约目录。
+10. `admin-config/`：H5 与管理后台配置契约目录。
 
 ## 建议继续补齐
 

@@ -9,6 +9,11 @@
 - 登录态、鉴权、分页、缓存和错误码约定。
 - H5 与正式业务后端之间的请求和响应结构。
 
+## 已有契约
+
+- `h5-bff-http-auth-contract.md`：定义 App Cookie 登录态、H5 BFF、Python / Java Authorization 鉴权之间的转换规则。
+- `promotion-bff-mock-contract.md`：定义推广模块首页、活动、榜单、权益页在真实后端完成前的 H5 BFF mock 数据结构。
+
 ## 模板
 
 使用：
@@ -16,4 +21,3 @@
 ```text
 .ai-workspace/templates/API_CONTRACT.md
 ```
-
