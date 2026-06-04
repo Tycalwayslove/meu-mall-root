@@ -371,6 +371,8 @@ docker run -d \
   -e H5_VERSION='${H5_VERSION}' \
   -e H5_RELEASE_LABEL='${H5_RELEASE_LABEL}' \
   -e H5_RELEASE_VARIANT='${H5_RELEASE_VARIANT}' \
+  -e H5_BASE_PATH='${H5_BASE_PATH}' \
+  -e NEXT_PUBLIC_H5_BASE_PATH='${H5_BASE_PATH}' \
   -p "127.0.0.1:\${selected_port}:3109" \
   '${H5_IMAGE}' >/dev/null
 

@@ -34,11 +34,15 @@ RUN pnpm build
 
 FROM node:22-bookworm-slim AS runner
 
+ARG H5_BASE_PATH=
+
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3109 \
     H5_VERSION=unknown \
-    H5_RELEASE_LABEL=
+    H5_RELEASE_LABEL= \
+    H5_BASE_PATH=${H5_BASE_PATH} \
+    NEXT_PUBLIC_H5_BASE_PATH=${H5_BASE_PATH}
 
 WORKDIR /app
 
