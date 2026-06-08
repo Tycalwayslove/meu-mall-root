@@ -30,6 +30,8 @@
 - `RELEASE_GOVERNANCE.md`：发布、灰度和回滚治理。
 - `H5_DEMAND_INTEGRATION_WORKFLOW.md`：H5 需求开发和跨端对接工作流。
 - `H5_PAGE_DEVELOPMENT_WORKFLOW.md`：H5 页面开发前的路由、渲染、BFF mock、资产和验收工作流。
+- `H5_FEISHU_KNOWLEDGE_SYNC_WORKFLOW.md`：将仓库事实源同步到飞书知识库的协作工作流。
+- `H5_FEISHU_BASE_SCHEDULE_WORKFLOW.md`：将 H5 页面、后端接口、原生对接和测试验收同步到飞书多维表格的排期协作工作流。
 - `GLOSSARY.md`：统一术语。
 - `templates/TASK.md`：工作项模板。
 - `templates/INTEGRATION_BRIEF.md`：跨团队对接说明模板。
@@ -37,12 +39,15 @@
 - `templates/NATIVE_BRIDGE_CONTRACT.md`：H5 与原生 Bridge 契约模板。
 - `templates/ADMIN_CONFIG_CONTRACT.md`：H5 与后台配置契约模板。
 - `templates/COUNTERPART_HANDOFF.md`：给后端、原生 App、管理后台、测试/发布的对外输出包模板。
+- `templates/FEISHU_KNOWLEDGE_PAGE.md`：飞书知识库页面模板。
+- `templates/FEISHU_BASE_H5_DEMAND_SCHEDULE_SCHEMA.md`：H5 需求排期飞书 Base 表结构模板。
 - `skills/`：本项目推荐使用的本地 Codex skill 说明。
 - `contracts/`：跨项目契约文档入口。
 - `integration-briefs/`：H5 需求对接说明入口。
 - `domain/`：业务领域模型文档入口。
 - `product/`：页面盘点、产品范围和端归属讨论入口。
 - `tasks/`：根级或跨项目工作项入口。
+- `plans/`：业务排期、飞书 Base 种子数据和阶段计划入口。
 
 ## 基本原则
 
