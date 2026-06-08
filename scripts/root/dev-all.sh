@@ -152,6 +152,7 @@ start_h5() {
     cd "${ROOT_DIR}/hybird-meumall"
     exec env \
       H5_BASE_PATH="${H5_BASE_PATH}" \
+      NEXT_PUBLIC_H5_BASE_PATH="${H5_BASE_PATH}" \
       H5_MANIFEST_URL="${MANIFEST_URL}" \
       NEXT_PUBLIC_H5_MANIFEST_URL="${MANIFEST_URL}" \
       NEXT_PUBLIC_CONFIG_API_BASE_URL="${CONFIG_API_BASE_URL}" \
