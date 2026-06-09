@@ -446,12 +446,12 @@ window.__bridgeHandler.emit("logout", { reason: "session_expired" })
 
 | From | 触发动作 | To | 容器策略 | 是否需要 Bridge | 当前实现 | 备注 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 推广首页 `/promotion` | 点击累计佣金 | 佣金收益 `/promotion/commission` | `new-h5-webview` | 需要 App 新开 WebView | 待确认/可能未绑准 | 正确入口 |
+| 推广首页 `/promotion` | 点击累计佣金 | 佣金收益 `/promotion/commission` | `new-h5-webview` | 需要 App 新开 WebView | H5 已接入 `HybridLink` | 正确入口 |
 | 推广首页 `/promotion` | 点击商品推广 | 推广商品 `/promotion/products` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 推广首页 `/promotion` | 点击奖励活动 | 活动中心 `/promotion/activities` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 推广首页 `/promotion` | 点击排行榜 | 榜单中心 `/promotion/rank-center` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 推广首页 `/promotion` | 点击推广名片 | 推广名片 `/promotion/card` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
-| 推广首页 `/promotion` | 点击头像/名称/徽章 | 无跳转 | 无 | 不需要 | 当前错误实现 | 后续删除跳转 |
+| 推广首页 `/promotion` | 点击头像/名称/徽章 | 无跳转 | 无 | 不需要 | H5 已修正 | 保持无跳转 |
 | 活动中心 `/promotion/activities` | 点击活动卡 | 活动详情 `/promotion/activities/[slug]` | `current-webview-push` | 不需要 | 已有 |  |
 | 活动中心 `/promotion/activities` | 点击奖励记录 | 奖励记录 `/promotion/activities/reward-records` | `current-webview-push` | 不需要 | 已有 |  |
 | 榜单中心 `/promotion/rank-center` | 点击销量榜 | 销量榜 `/promotion/ranking/sales` | `current-webview-push` | 不需要 | 已有 |  |
@@ -466,10 +466,10 @@ window.__bridgeHandler.emit("logout", { reason: "session_expired" })
 | 我的 `/mine` | 点击订单入口 | 订单记录 `/orders` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 我的 `/mine` | 点击商品收藏 | 商品收藏 `/favorites/products` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 我的 `/mine` | 点击店铺收藏 | 店铺收藏 `/favorites/shops` | `new-h5-webview` | 需要 App 新开 WebView | 间接已有 |  |
-| 我的 `/mine` | 点击设置 | 设置页 | `native-page` | 需要 App | 当前错误占位 `/mine` | 后续改 Bridge |
+| 我的 `/mine` | 点击设置 | 设置页 | `native-page` | 需要 App | H5 已发送 `native_page=settings` | App 实现正式设置页 |
 | 我的 `/mine` | 点击消息中心 | 消息 `/messages` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
 | 我的 `/mine` | 点击客服服务 | 咨询 `/consult` | `new-h5-webview` | 需要 App 新开 WebView | 已有 |  |
-| 我的 `/mine` | 点击 banner | 无或待定 | 待定 | 待定 | 当前错误 `/member` | `/member` 删除后必须修正 |
+| 我的 `/mine` | 点击 banner | 无跳转 | 无 | 不需要 | H5 已取消 `/member` 跳转 | 后续如有运营目标再补 |
 
 ### 返回和关闭规则
 
@@ -526,7 +526,7 @@ window.__bridgeHandler.emit("logout", { reason: "session_expired" })
 - 容器策略：`tab-root-webview`。
 - 入口：点击推广 Tab、首页推广入口切 Tab。
 - 出口：佣金收益、推广商品、活动中心、榜单中心、推广名片。
-- 错误跳转：头像、名称、徽章跳权益中心需要删除。
+- 当前跳转：头像、名称、徽章不发起跳转；权益中心入口收敛到我的页。
 - 返回规则：根页面由 App Tab 管理。
 
 ### 权益中心 `/promotion/benefits`
@@ -560,7 +560,7 @@ window.__bridgeHandler.emit("logout", { reason: "session_expired" })
 - 容器策略：`tab-root-webview`。
 - 入口：点击我的 Tab。
 - 出口：权益中心、订单记录、商品收藏、消息、咨询、原生设置。
-- 待修正：banner 当前指向 `/member`，应删除或改目标；地址管理、帮助中心等当前占位指向 `/mine`，需要重新定义。
+- 当前跳转：权益中心、订单、收藏、客服等已走 H5/Native 容器策略；banner 不再指向 `/member`；地址管理、帮助中心等未确认入口保持不跳转。
 - 返回规则：根页面由 App Tab 管理。
 
 ## 原生 App 需要讨论和实现的能力
@@ -946,7 +946,6 @@ final class MeuMallBridgeHandler: NSObject, WKScriptMessageHandler {
             navigator?.openProductDetail(params: params)
         case "webview":
             navigator?.openH5WebView(params: params)
-        // 以下 route 是下一步 H5 需要扩展的正式链路。
         case "tab":
             navigator?.switchTab(params: params)
         case "close_webview":
@@ -965,7 +964,6 @@ final class MeuMallBridgeHandler: NSObject, WKScriptMessageHandler {
             emit("logout", payload: ["reason": "session_expired"])
         case "share":
             navigator?.openSharePanel(payload)
-        // 下一步 H5 扩展后开启。
         case "route_changed":
             navigator?.updateCurrentH5Route(payload)
         default:
@@ -1100,7 +1098,6 @@ class MeuMallBridgeHandler(
             "back" -> navigator.goBackOrCloseCurrentWebView()
             "product_detail" -> navigator.openProductDetail(params)
             "webview" -> navigator.openH5WebView(params)
-            // 以下 route 是下一步 H5 需要扩展的正式链路。
             "tab" -> navigator.switchTab(params)
             "close_webview" -> navigator.closeCurrentWebView()
             "native_page" -> navigator.openNativePage(params)
@@ -1211,16 +1208,16 @@ type RouteChangedPayload = {
 - `native.openPayment(payload)`
 - `native.share(payload)`
 
-## H5 侧待修正事项
+## H5 侧实现状态
 
 | 事项 | 当前情况 | 目标情况 |
 | --- | --- | --- |
-| `/member` | 我的页 banner 仍指向 `/member` | 删除 `/member` 路由和入口，或改为已确认目标 |
+| `/member` | H5 `v1.0.11` 已删除页面，manifest 不再暴露，线上 `/member` 返回 404 | 保持不作为正式页面 |
 | 推广首页头像/名称/徽章 | H5 已不再跳权益中心 | 保持无跳转 |
-| 首页推广带货入口 | 当前是 H5 链接 `/promotion` | 改为请求 App 切推广 Tab |
-| 设置入口 | 当前多个入口还指向 `/mine` 占位 | 改为 App 原生设置 |
-| Tab 根页面到二级页 | 当前代码多为普通 H5 Link | 后续接 Bridge 新开 H5 WebView |
-| 二级页回根页面 | 当前多为 `backHref` | 后续用 Bridge 关闭当前 WebView/切 Tab |
+| 首页推广带货入口 | H5 已通过 `switch-tab` 请求 App 切推广 Tab | App 消费 `route=tab` |
+| 设置入口 | H5 已发送 `native_page=settings` | App 实现正式原生设置页 |
+| Tab 根页面到二级页 | H5 已通过 `HybridLink strategy="new-webview"` 发起 | App 新开 H5 WebView |
+| 二级页回根页面 | H5 导航返回已发 `route=back`；需要明确关页时支持 `close_webview` / `tab` | App 执行 WebView history back 或关闭当前 WebView |
 
 ## 待确认事项
 
