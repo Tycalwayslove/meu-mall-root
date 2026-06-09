@@ -112,7 +112,7 @@ if [ -z "${H5_ASSET_PREFIX}" ] && [ -n "${NEXT_PUBLIC_H5_ASSET_BASE_URL}" ]; the
   H5_ASSET_PREFIX="${NEXT_PUBLIC_H5_ASSET_BASE_URL}"
 fi
 
-H5_ROUTES="${H5_ROUTES:-/,/promotion,/mine,/category,/messages,/seckill,/product/p-1001,/consult,/order-confirm,/orders,/favorites/products,/favorites/shops,/member,/promotion/products,/promotion/commission,/promotion/card,/promotion/level,/promotion/benefits,/promotion/activities,/promotion/rank-center,/promotion/ranking,/promotion/ranking/sales,/promotion/ranking/amount}"
+H5_ROUTES="${H5_ROUTES:-/,/promotion,/mine,/category,/messages,/seckill,/product/p-1001,/consult,/order-confirm,/orders,/favorites/products,/favorites/shops,/promotion/products,/promotion/commission,/promotion/card,/promotion/level,/promotion/benefits,/promotion/activities,/promotion/rank-center,/promotion/ranking,/promotion/ranking/sales,/promotion/ranking/amount}"
 REGISTER_RELEASE="${REGISTER_RELEASE:-true}"
 PROMOTE_RELEASE="${PROMOTE_RELEASE:-false}"
 INSTALL_NGINX="${INSTALL_NGINX:-true}"
