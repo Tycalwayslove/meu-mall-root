@@ -13,8 +13,13 @@
 
 | 页面 | 飞书链接 | 仓库事实源 |
 | --- | --- | --- |
+| 00 MeuMall 项目总览与协作入口 | <https://v05ctaei9gn.feishu.cn/wiki/IGtzwfR1yi3F9Zkim4Ocno1gnAd> | `.ai-workspace/PROJECT_MAP.md`、`.ai-workspace/product/product-decisions.md`、`.ai-workspace/product/page-inventory.md` |
 | 00 知识库使用说明与同步规则 | <https://v05ctaei9gn.feishu.cn/wiki/GRzDwu5CwiH3vEkb51Dc41atnzf> | `.ai-workspace/H5_FEISHU_KNOWLEDGE_SYNC_WORKFLOW.md` |
 | 01 H5 与原生 App 路由跳转对接说明 | <https://v05ctaei9gn.feishu.cn/wiki/OJk1wa43PiR9lTkYs2YcW8llnmf> | `.ai-workspace/integration-briefs/BRIEF-2026-0605-h5-native-route-map.md` |
+| 02 H5 页面清单与开发进度 | <https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre> | `.ai-workspace/product/page-inventory.md`、`hybird-meumall/src/app` |
+| 03 H5 BFF、鉴权与后端接口对接说明 | <https://v05ctaei9gn.feishu.cn/wiki/GPhdwjQ87iQAQskeS6lc9bMOnte> | `.ai-workspace/contracts/api/h5-bff-http-auth-contract.md`、`.ai-workspace/contracts/api/promotion-bff-mock-contract.md` |
+| 04 H5 发版、版本切换与回滚流程 | <https://v05ctaei9gn.feishu.cn/wiki/HyBpwTbNUigKsOkO2Qgc2rjBnie> | `.ai-workspace/H5_RELEASE_RUNBOOK.md`、`.ai-workspace/H5_FEISHU_RELEASE_NOTIFICATION_WORKFLOW.md` |
+| 05 H5 需求开发与跨团队协作流程 | <https://v05ctaei9gn.feishu.cn/wiki/RaXBw8iZZiDjGCkUH0WcYWaPnpf> | `.ai-workspace/H5_DEMAND_INTEGRATION_WORKFLOW.md`、`.ai-workspace/H5_PAGE_DEVELOPMENT_WORKFLOW.md` |
 | 99 飞书知识库页面模板 | <https://v05ctaei9gn.feishu.cn/wiki/U6cXwVjNxi5KQVkSmE6cHkWPnVq> | `.ai-workspace/templates/FEISHU_KNOWLEDGE_PAGE.md` |
 
 ## 目标

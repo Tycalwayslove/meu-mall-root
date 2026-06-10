@@ -118,6 +118,8 @@ PROMOTE_RELEASE="${PROMOTE_RELEASE:-false}"
 INSTALL_NGINX="${INSTALL_NGINX:-true}"
 RUN_REMOTE_SMOKE="${RUN_REMOTE_SMOKE:-true}"
 SYNC_WORKSPACE="${SYNC_WORKSPACE:-true}"
+SEND_FEISHU_REVIEW="${SEND_FEISHU_REVIEW:-true}"
+FEISHU_REVIEW_DRY_RUN="${FEISHU_REVIEW_DRY_RUN:-false}"
 
 SSH_KEY="${SSH_KEY:-}"
 SERVER_PASSWORD="${SERVER_PASSWORD:-}"
@@ -169,6 +171,8 @@ Container:    ${H5_CONTAINER}
 Host port:    ${H5_HOST_PORT:-auto}
 Register:     ${REGISTER_RELEASE}
 Promote:      ${PROMOTE_RELEASE}
+Feishu review:${SEND_FEISHU_REVIEW}
+Feishu dry:   ${FEISHU_REVIEW_DRY_RUN}
 CDN asset:    ${NEXT_PUBLIC_H5_ASSET_BASE_URL:-none}
 SUMMARY
 }
@@ -565,6 +569,19 @@ if promote:
 PY
 }
 
+send_feishu_release_review() {
+  local review_args=("run" "feishu:h5-release-notice" "--" "request-review")
+
+  if [ "${FEISHU_REVIEW_DRY_RUN}" = "true" ]; then
+    review_args+=("--dry-run")
+  fi
+
+  (
+    cd "${ROOT_DIR}"
+    pnpm "${review_args[@]}"
+  )
+}
+
 print_summary
 
 if [ "${SYNC_WORKSPACE}" = "true" ]; then
@@ -592,6 +609,13 @@ if [ "${REGISTER_RELEASE}" = "true" ]; then
   register_release
 else
   echo "== Skip release registration =="
+fi
+
+if [ "${SEND_FEISHU_REVIEW}" = "true" ]; then
+  echo "== Send Feishu release review =="
+  send_feishu_release_review
+else
+  echo "== Skip Feishu release review =="
 fi
 
 echo "H5 version deploy complete: https://${DOMAIN}${H5_BASE_PATH}/"

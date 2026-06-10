@@ -1,0 +1,37 @@
+{
+  "profile": "company-feishu",
+  "sendAs": "bot",
+  "approvalReadAs": "bot",
+  "senderDisplayName": "company-feishu",
+  "reviewMode": "bot_chat",
+  "reviewChatId": "",
+  "reviewUserId": "",
+  "targetChatId": "",
+  "manifestUrl": "https://hybird.aigcpop.com/api/h5/manifest/active?environment=prod",
+  "serviceBaseUrl": "https://hybird.aigcpop.com",
+  "approvalKeywords": ["同意", "确认", "approve", "approved"],
+  "scheduleBaseUrl": "",
+  "knowledgeBaseUrl": "https://v05ctaei9gn.feishu.cn/wiki/ZbjXwxtBEiXDjSkqtbRcfEpSnhh",
+  "releaseNotice": {
+    "summary": "",
+    "nativeDone": [],
+    "nativeNeeded": [],
+    "backendDone": [],
+    "backendNeeded": [],
+    "testFocus": []
+  },
+  "projectOverview": {
+    "stage": "",
+    "deliverySystem": [],
+    "h5Architecture": [],
+    "pageProgress": [],
+    "crossTeamProgress": [],
+    "nativeImpact": [],
+    "backendImpact": [],
+    "testImpact": [],
+    "nativeNeeded": [],
+    "backendNeeded": [],
+    "testNeeded": [],
+    "futureNoticeRule": []
+  }
+}

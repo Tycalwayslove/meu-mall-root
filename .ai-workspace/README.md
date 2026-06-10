@@ -32,6 +32,8 @@
 - `H5_PAGE_DEVELOPMENT_WORKFLOW.md`：H5 页面开发前的路由、渲染、BFF mock、资产和验收工作流。
 - `H5_FEISHU_KNOWLEDGE_SYNC_WORKFLOW.md`：将仓库事实源同步到飞书知识库的协作工作流。
 - `H5_FEISHU_BASE_SCHEDULE_WORKFLOW.md`：将 H5 页面、后端接口、原生对接和测试验收同步到飞书多维表格的排期协作工作流。
+- `H5_FEISHU_RELEASE_NOTIFICATION_WORKFLOW.md`：H5 发版后的飞书审核、正式群通报和排期同步工作流。
+- `H5_RELEASE_RUNBOOK.md`：H5 多版本容器发版、Jenkins 发版、active 切换和回滚操作手册。
 - `GLOSSARY.md`：统一术语。
 - `templates/TASK.md`：工作项模板。
 - `templates/INTEGRATION_BRIEF.md`：跨团队对接说明模板。

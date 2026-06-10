@@ -105,7 +105,9 @@ h5VersionJob.addProperty(new ParametersDefinitionProperty([
   new BooleanParameterDefinition('REGISTER_RELEASE', true, '是否注册 candidate release'),
   new BooleanParameterDefinition('PROMOTE_RELEASE', false, '是否注册后立即提升为 active'),
   new BooleanParameterDefinition('INSTALL_NGINX', true, '是否写入版本 nginx location 并 reload'),
-  new BooleanParameterDefinition('RUN_REMOTE_SMOKE', true, '是否执行版本 URL smoke check')
+  new BooleanParameterDefinition('RUN_REMOTE_SMOKE', true, '是否执行版本 URL smoke check'),
+  new BooleanParameterDefinition('SEND_FEISHU_REVIEW', true, '发版完成后是否发送飞书待审核通报到审核群'),
+  new BooleanParameterDefinition('FEISHU_REVIEW_DRY_RUN', false, '飞书待审核通报是否只 dry-run 不真实发送')
 ]))
 h5VersionJob.setConcurrentBuild(false)
 h5VersionJob.save()
