@@ -783,6 +783,7 @@ function buildProjectOverview(context, config) {
 
 function buildReleaseNotice(context, config) {
   const override = config.releaseNotice || {};
+  const knownReleaseNotice = buildKnownReleaseNotice(context);
   const rawChanges = context.latestChange.changes.length
     ? context.latestChange.changes
     : context.commitLines.map((line) => line.replace(/^[a-f0-9]+\s+/, "")).slice(0, 8);
@@ -793,10 +794,14 @@ function buildReleaseNotice(context, config) {
 
   const changes = override.changes?.length
     ? override.changes
+    : knownReleaseNotice.changes?.length
+      ? knownReleaseNotice.changes
     : humanizeChanges(rawChanges, context);
 
   const impact = override.impact?.length
     ? override.impact
+    : knownReleaseNotice.impact?.length
+      ? knownReleaseNotice.impact
     : [
         `H5 线上入口已切到 ${activeVersion}，App 重新读取 active manifest 后会拿到 ${basePath} 这一版资源。`,
         hasRoute("/member")
@@ -808,6 +813,8 @@ function buildReleaseNotice(context, config) {
 
   const verification = override.verification?.length
     ? override.verification
+    : knownReleaseNotice.verification?.length
+      ? knownReleaseNotice.verification
     : [
         "H5 自动化检查已过：test、typecheck、lint、生产构建都通过。",
         `线上 smoke 已过：${basePath}/api/health、首页、推广页、我的页、搜索页都能访问。`,
@@ -820,6 +827,8 @@ function buildReleaseNotice(context, config) {
     verification,
     nativeDone: override.nativeDone?.length
       ? override.nativeDone
+      : knownReleaseNotice.nativeDone?.length
+        ? knownReleaseNotice.nativeDone
       : [
           "H5 已按 active manifest 版本体系发布，当前版本入口是 `/h5-v/<version>`。",
           "H5 已发出 Bridge route：`webview`、`tab`、`back`、`close_webview`、`native_page=settings`。",
@@ -827,6 +836,8 @@ function buildReleaseNotice(context, config) {
         ],
     nativeNeeded: override.nativeNeeded?.length
       ? override.nativeNeeded
+      : knownReleaseNotice.nativeNeeded?.length
+        ? knownReleaseNotice.nativeNeeded
       : [
           "请确认 App 启动和打开 H5 时仍以 `GET /api/h5/manifest/active?environment=prod` 为准，不要写死某个版本 URL。",
           "请确认原生侧已处理 `tab`、`close_webview`、`native_page=settings` 和 `route_changed`，尤其是二级 WebView 返回首页/Tab 根页面时要关闭当前 WebView。",
@@ -834,12 +845,16 @@ function buildReleaseNotice(context, config) {
         ],
     backendDone: override.backendDone?.length
       ? override.backendDone
+      : knownReleaseNotice.backendDone?.length
+        ? knownReleaseNotice.backendDone
       : [
           "本次 H5 发布已接入 release/manifest 服务：`POST /api/releases`、`POST /api/releases/{id}/promote`、`GET /api/h5/manifest/active?environment=prod`。",
           "本次没有新增正式业务 API 依赖；推广、权益、榜单相关页面仍以 H5 BFF mock 和静态配置为主。",
         ],
     backendNeeded: override.backendNeeded?.length
       ? override.backendNeeded
+      : knownReleaseNotice.backendNeeded?.length
+        ? knownReleaseNotice.backendNeeded
       : [
           "后续正式联调前，需要补齐推广首页、权益中心、榜单中心、佣金收益等业务接口，并明确 Java/Python token 分别使用哪个服务。",
           "如果首页、推广页或活动入口要从管理后台配置，请后端/管理台提前给出字段结构、上下线规则和兜底数据。",
@@ -847,11 +862,64 @@ function buildReleaseNotice(context, config) {
         ],
     testFocus: override.testFocus?.length
       ? override.testFocus
+      : knownReleaseNotice.testFocus?.length
+        ? knownReleaseNotice.testFocus
       : [
           "请重点回归 App 内打开 H5、H5 内跳 H5、H5 返回/关闭 WebView、切回 Tab 根页面这几条链路。",
           "请检查 `/member` 已不可访问，旧入口不要再出现。",
           "请检查版本角标、图片资源、权益中心/推广相关页面是否有白屏或 404。",
         ],
+  };
+}
+
+function buildKnownReleaseNotice(context) {
+  if (context.version !== "v1.0.12") return {};
+  return {
+    changes: [
+      "搜索页完成静态高保真：搜索历史、清除历史弹窗、tab 切换、筛选展开/选择/蒙层关闭都已经补齐。",
+      "新增搜索热榜页 `/search/ranking`，从搜索页“查看更多”进入。",
+      "推广商品页完成筛选、商品卡、收藏/推广按钮；筛选选中后会展示当前选项。",
+      "推广商品“推广”按钮已接入 `share` Bridge，当前 payload 固定 `productId=1001`，方便原生 App 联调。",
+      "限时秒杀页完成顶部背景图和商品区静态展示。",
+      "商品详情补了购买弹窗，点击“选择”不再写入 hash，而是直接打开购买弹窗。",
+      "新增提交订单静态页 `/order-confirm`，购买弹窗确认后进入。",
+      "商品卡片图片统一使用 `ProductImagePlaceholder` 缺省组件；分类页 tab 改为组件内状态切换，不再写 `#level-*`。",
+    ],
+    impact: [
+      "线上 active 已从 `v1.0.11` 切到 `v1.0.12`，manifest 的 basePath 是 `/h5-v/v1.0.12`。",
+      "这版主要影响 `/search`、`/search/ranking`、`/promotion/products`、`/seckill`、`/product/[id]`、`/order-confirm`、`/category`。",
+      "当前仍是“静态页面 + H5 Mock”阶段，真实后端接口还没全面接入；这次先验证页面、交互、路由和 Bridge 调用是否符合预期。",
+    ],
+    verification: [
+      "本地 `pnpm test` 154 个用例通过，typecheck 通过，生产 build 通过。",
+      "线上 version smoke 通过，active manifest 已确认是 `v1.0.12`。",
+      "`/promotion/products`、`/search`、秒杀背景图资源返回 200。",
+    ],
+    nativeDone: [
+      "H5 已在推广商品页发起 `share` Bridge，payload 中 `productId=1001`。",
+      "H5 页面内普通跳转会尽量保持当前 WebView 内 push；首页打开商品详情仍按之前讨论新开 H5 WebView。",
+    ],
+    nativeNeeded: [
+      "iOS/Android 请接一下推广商品分享 Bridge，先按 `productId=1001` 验证能否拉起原生分享面板。",
+      "搜索页、推广商品页、秒杀页、商品详情、订单确认这些二级页返回时，请继续按 WebView history / close WebView 规则验证。",
+      "商品详情地址入口后续要跳地址列表，目前 H5 还没做地址列表页，先不要按最终交易链路验收。",
+    ],
+    backendDone: [
+      "发版和 manifest 已走真实服务：`v1.0.12` 已注册并 promoted active。",
+      "页面当前使用 H5 Mock 数据，不阻塞大家先看页面和交互。",
+    ],
+    backendNeeded: [
+      "需要补搜索建议、搜索结果、搜索热榜接口。",
+      "需要补推广商品列表/筛选接口。",
+      "需要补秒杀活动、秒杀商品、库存、服务端时间接口。",
+      "需要补商品详情实时价格、库存、规格、可购买状态接口。",
+      "需要补订单预览、创建订单接口。",
+    ],
+    testFocus: [
+      "重点测 `/search`、`/search/ranking`、`/promotion/products`、`/seckill`、`/product/[id]`、`/order-confirm`、`/category`。",
+      "重点检查筛选条件、tab 切换、返回行为、购买弹窗、订单确认静态页和静态图片资源。",
+      "推广商品分享需要在 App 内验证 Bridge payload 是否被原生收到。",
+    ],
   };
 }
 
