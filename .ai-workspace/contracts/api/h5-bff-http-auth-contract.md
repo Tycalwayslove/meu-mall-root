@@ -61,6 +61,53 @@ x-app-env: <test|prod>
 x-route: <h5-route>
 ```
 
+## 客户端上下文 Header
+
+为了定位线上问题是否和 App 版本、系统版本、设备型号或 WebView 容器有关，H5 请求链路需要透传客户端上下文。
+
+浏览器请求 H5 BFF 时，`User-Agent` 由 WebView 自动携带，H5 client 不手动设置。H5 client 可额外传递以下可选 header：
+
+| Header | 说明 | 是否敏感 |
+| --- | --- | --- |
+| `x-page-session-id` | 单次页面访问会话 ID。 | 否 |
+| `x-h5-version` | H5 版本。 | 否 |
+| `x-h5-route` | 当前 H5 页面路由。 | 否 |
+| `x-app-name` | App 名称。 | 否 |
+| `x-app-version` | App 版本号。 | 否 |
+| `x-app-build` | App build 号。 | 否 |
+| `x-platform` | `ios` / `android` / `web`。 | 否 |
+| `x-os-version` | 系统版本。 | 否 |
+| `x-device-model` | 设备型号。 | 否 |
+| `x-webview-version` | WebView / WebKit 版本。 | 否 |
+
+BFF 调 Java / Python 后端时，除 `Authorization` 外，还应透传：
+
+```http
+user-agent: <WebView 原始 User-Agent>
+x-request-id: <request-id>
+x-page-session-id: <page-session-id>
+x-h5-version: <h5-version>
+x-h5-route: <h5-route>
+x-app-name: <app-name>
+x-app-version: <app-version>
+x-app-build: <app-build>
+x-platform: <ios|android|web>
+x-os-version: <os-version>
+x-device-model: <device-model>
+x-webview-version: <webview-version>
+```
+
+新增 header 均为可选字段，后端缺失时不得拒绝请求。正式环境日志不得记录 token、完整 Cookie、手机号、用户姓名、定位、完整地址或支付敏感信息。
+
+Java / Python 后端第一阶段建议做到：
+
+```text
+接收 x-request-id 和客户端上下文 header。
+入口日志打印 x-request-id、App 版本、系统版本和设备型号。
+调用下游时继续透传 x-request-id。
+响应 header 返回 x-request-id。
+```
+
 ## 环境变量
 
 | 变量 | 是否公开到浏览器 | 说明 |
