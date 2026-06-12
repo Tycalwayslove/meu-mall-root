@@ -507,7 +507,7 @@ function renderReviewMessage(context, config) {
   return renderMessage({
     context,
     config,
-    title: "【待审核】MeuMall H5 发版通报",
+    title: context.version === "v1.0.13" ? "【更正版待审核】MeuMall H5 发版通报" : "【待审核】MeuMall H5 发版通报",
     includeApprovalGuide: true,
   });
 }
@@ -873,6 +873,63 @@ function buildReleaseNotice(context, config) {
 }
 
 function buildKnownReleaseNotice(context) {
+  if (context.version === "v1.0.13") {
+    return {
+      changes: [
+        "首页真实接口链路已联调完成：新增 `/api/bff/home`、`/api/bff/home/for-you-products`、`/api/bff/home/recommend-products`，首页和推荐商品页已从静态 mock 迁到 H5 BFF 聚合真实数据。",
+        "商品详情真实链路已联调完成：新增 `/api/bff/product-detail` 和 `/api/bff/order-confirm`，商品详情页已接入真实商品详情、规格、店铺、评价和富文本详情内容。",
+        "当前主要卡点是下单链路：商品详情和订单确认页已经能走到前端页面，但后端创建订单/下单能力还不可用，导致目前无法完成真实下单闭环。",
+        "个人中心后续二级页已完成高保真静态页面：钱包、优惠券、我的收藏、我的足迹、订单列表都已按 Figma 方向落地；钱包/订单 tab 切换改为页面内状态，不再修改路由。",
+        "我的收藏和我的足迹补齐编辑删除确认；个人中心达人等级改为图片徽章，收藏/足迹/订单商品图统一使用缺省图片组件。",
+        "Bridge 和设置页链路已更新：H5 跳原生设置页、关闭二级 WebView、切 Tab、返回和 `route_changed` 上报都收敛到统一 Bridge route，并同步更新 Native Bridge 文档和页面盘点。",
+        "根工作区同步了首页真实接口、商品详情真实链路、H5 BFF 鉴权、Native Bridge、个人中心二级页等任务、契约和集成说明。",
+        "缺省图标只是本次末尾的小优化：`ProductImagePlaceholder` 现在默认居中展示 `Vector.png` 图标，背景色仍由 CSS 控制。",
+      ],
+      impact: [
+        "线上 active 已切到 `v1.0.13`，manifest 的 basePath 是 `/h5-v/v1.0.13`，App 重新读取 active manifest 后会进入这一版。",
+        "这版重点影响首页、推荐商品页、商品详情页、订单确认页、个人中心二级页，以及 H5 到原生设置页/二级 WebView 的 Bridge 跳转。",
+        "首页和商品详情不再是纯静态样式验证，已经进入真实接口联调口径；个人中心二级页目前仍是高保真静态页面，先用于视觉、交互和路由验收。",
+        "交易链路目前不能按“已可下单”验收：商品可以看详情、选规格、进入订单确认，但创建订单卡在后端下单接口能力。",
+        "钱包和订单页 tab 切换不会再 push 路由，避免影响 WebView 返回事件；切换时保留页面内动画和 tab 横线移动。",
+      ],
+      verification: [
+        "H5 本地自动化已过：`pnpm test` 44 个文件 / 226 个用例通过，`pnpm typecheck` 通过，`pnpm lint` 通过，生产 `pnpm run build` 通过。",
+        "线上发布脚本 smoke 已过：`/h5-v/v1.0.13/api/health` 和版本首页可访问。",
+        "外网路由已验证：`/mine`、`/wallet`、`/orders`、`/favorites/products`、`/footprints`、`/coupons` 均返回 200。",
+        "active manifest 已确认指向 `v1.0.13`，回滚版本是 `v1.0.12`。",
+      ],
+      nativeDone: [
+        "H5 已按 active manifest 版本体系发布，当前版本入口是 `/h5-v/v1.0.13`。",
+        "H5 已统一发出 Bridge route：`webview`、`tab`、`back`、`close_webview`、`native_page=settings`。",
+        "设置入口已改为走 `native_page=settings`，不再当作普通 H5 页面跳转。",
+        "H5 已上报 `event/route_changed`，用于原生侧同步 WebView 内部路由状态。",
+      ],
+      nativeNeeded: [
+        "请确认 App 启动和打开 H5 时仍以 `GET /api/h5/manifest/active?environment=prod` 为准，不要写死某个版本 URL。",
+        "请确认原生侧已处理 `native_page=settings`，个人中心设置入口需要拉起原生设置页。",
+        "请重点实机验证二级 WebView 返回：钱包、订单、收藏、足迹、优惠券、商品详情、订单确认页返回时不要被页面内 tab 状态污染。",
+        "请确认 `tab`、`back`、`close_webview`、`webview` 和 `route_changed` 的事件处理仍符合最新 Bridge 文档。",
+      ],
+      backendDone: [
+        "首页真实接口已通过 H5 BFF 接入并完成联调，首页推荐和推荐商品列表不再只依赖静态 mock。",
+        "商品详情真实接口已通过 H5 BFF 接入并完成联调，商品详情、规格、店铺、评价、富文本详情已经进入真实数据口径。",
+        "发版和 manifest 已走真实 release 服务：`v1.0.13` 已注册并 promoted active。",
+      ],
+      backendNeeded: [
+        "当前最需要后端支持的是下单：请优先补齐或修复订单预览/创建订单接口，让商品详情到订单确认后的真实下单链路能闭环。",
+        "请明确下单接口所需 token、地址、SKU、库存、价格、优惠券、运费、错误码和不可购买状态的字段口径。",
+        "个人中心钱包、优惠券、收藏、足迹、订单列表目前是高保真静态页，后续需要后端提供真实数据接口和分页/删除/筛选规则。",
+        "如果首页和商品详情后续字段仍会调整，请同步接口契约，避免 H5 BFF 再次临时适配。",
+      ],
+      testFocus: [
+        "重点回归首页真实数据展示、推荐商品页、商品详情真实数据、规格选择、富文本详情和订单确认页。",
+        "请把“无法真实下单”作为已知卡点记录：目前不要把创建订单失败判断成 H5 页面回归失败，除非后端确认接口已可用。",
+        "重点验收个人中心二级页的高保真静态效果：钱包、优惠券、收藏、足迹、订单列表，以及编辑删除确认弹窗。",
+        "重点验证钱包/订单 tab 切换不会改变 URL，页面返回事件不被影响。",
+        "重点验证设置页 Bridge：点击个人中心设置入口应进入原生设置页。",
+      ],
+    };
+  }
   if (context.version !== "v1.0.12") return {};
   return {
     changes: [
