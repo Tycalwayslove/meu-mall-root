@@ -410,6 +410,7 @@ bash scripts/deploy/h5-version-deploy.sh
     - HTTP Host 头访问版本 health。
     - HTTPS 域名访问版本 health。
     - HTTPS 域名访问版本首页。
+    - 版本容器已注入 Java / Python BFF 运行时环境，避免 API route 报 `JAVA_API_BASE_URL is required.` 或 `PYTHON_API_BASE_URL is required.`。
 15. 调用 `hybird-meumall/scripts/ai/register-release.ts` 生成 release payload。
 16. 请求 `POST /api/releases` 注册 candidate release。
 17. 如果 `PROMOTE_RELEASE=true`，继续请求 `POST /api/releases/{id}/promote` 切 active。
@@ -428,6 +429,7 @@ bash scripts/deploy/h5-version-deploy.sh
 | `SSH_KEY` | 空 | SSH 私钥路径；配置后可不用密码 |
 | `GIT_REF` | `h5/v{version}` | 要发布的 Git ref |
 | `H5_HOST_PORT` | 空 | 指定宿主机端口；空则自动选 `3200-3299` |
+| `H5_RUNTIME_ENV_FILE` | `hybird-meumall/config/env/h5.prod.env` | 发布版本容器的运行时环境来源；脚本会读取并注入 `APP_ENV`、`JAVA_API_BASE_URL`、`PYTHON_API_BASE_URL`、`JAVA_OSS_ASSET_BASE_URL` 和 BFF 日志配置 |
 | `NEXT_PUBLIC_H5_ASSET_BASE_URL` | 空 | CDN 静态资源根地址；当前可留空 |
 | `REGISTER_RELEASE` | `true` | 是否注册 release |
 | `PROMOTE_RELEASE` | `false` | 是否发布后立即切 active |

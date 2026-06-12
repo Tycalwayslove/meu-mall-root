@@ -112,6 +112,38 @@ if [ -z "${H5_ASSET_PREFIX}" ] && [ -n "${NEXT_PUBLIC_H5_ASSET_BASE_URL}" ]; the
   H5_ASSET_PREFIX="${NEXT_PUBLIC_H5_ASSET_BASE_URL}"
 fi
 
+H5_RUNTIME_ENV_FILE="${H5_RUNTIME_ENV_FILE:-${ROOT_DIR}/hybird-meumall/config/env/h5.prod.env}"
+
+read_h5_env_value() {
+  local key="$1"
+  if [ ! -f "${H5_RUNTIME_ENV_FILE}" ]; then
+    return 0
+  fi
+
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "${H5_RUNTIME_ENV_FILE}"
+    set +a
+    eval 'printf "%s" "${'"${key}"':-}"'
+  )
+}
+
+APP_ENV="${APP_ENV:-$(read_h5_env_value APP_ENV)}"
+NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-$(read_h5_env_value NEXT_PUBLIC_APP_ENV)}"
+NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-$(read_h5_env_value NEXT_PUBLIC_API_BASE_URL)}"
+JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-$(read_h5_env_value JAVA_API_BASE_URL)}"
+JAVA_OSS_ASSET_BASE_URL="${JAVA_OSS_ASSET_BASE_URL:-$(read_h5_env_value JAVA_OSS_ASSET_BASE_URL)}"
+PYTHON_API_BASE_URL="${PYTHON_API_BASE_URL:-$(read_h5_env_value PYTHON_API_BASE_URL)}"
+H5_BFF_LOG_BACKEND_RESPONSE="${H5_BFF_LOG_BACKEND_RESPONSE:-$(read_h5_env_value H5_BFF_LOG_BACKEND_RESPONSE)}"
+H5_BFF_BACKEND_RESPONSE_LOG_LIMIT="${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT:-$(read_h5_env_value H5_BFF_BACKEND_RESPONSE_LOG_LIMIT)}"
+
+APP_ENV="${APP_ENV:-prod}"
+NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-${APP_ENV}}"
+NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-/api/bff}"
+H5_BFF_LOG_BACKEND_RESPONSE="${H5_BFF_LOG_BACKEND_RESPONSE:-0}"
+H5_BFF_BACKEND_RESPONSE_LOG_LIMIT="${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT:-30000}"
+
 H5_ROUTES="${H5_ROUTES:-/,/promotion,/mine,/category,/messages,/seckill,/product/p-1001,/consult,/order-confirm,/orders,/favorites/products,/favorites/shops,/promotion/products,/promotion/commission,/promotion/card,/promotion/level,/promotion/benefits,/promotion/activities,/promotion/rank-center,/promotion/ranking,/promotion/ranking/sales,/promotion/ranking/amount}"
 REGISTER_RELEASE="${REGISTER_RELEASE:-true}"
 PROMOTE_RELEASE="${PROMOTE_RELEASE:-false}"
@@ -174,6 +206,10 @@ Promote:      ${PROMOTE_RELEASE}
 Feishu review:${SEND_FEISHU_REVIEW}
 Feishu dry:   ${FEISHU_REVIEW_DRY_RUN}
 CDN asset:    ${NEXT_PUBLIC_H5_ASSET_BASE_URL:-none}
+H5 env file:  ${H5_RUNTIME_ENV_FILE}
+App env:      ${APP_ENV}
+Java API:     ${JAVA_API_BASE_URL:-missing}
+Python API:   ${PYTHON_API_BASE_URL:-missing}
 SUMMARY
 }
 
@@ -360,6 +396,14 @@ docker build \
   --build-arg H5_VERSION='${H5_VERSION}' \
   --build-arg H5_RELEASE_LABEL='${H5_RELEASE_LABEL}' \
   --build-arg NEXT_PUBLIC_H5_ASSET_BASE_URL='${NEXT_PUBLIC_H5_ASSET_BASE_URL}' \
+  --build-arg APP_ENV='${APP_ENV}' \
+  --build-arg NEXT_PUBLIC_APP_ENV='${NEXT_PUBLIC_APP_ENV}' \
+  --build-arg NEXT_PUBLIC_API_BASE_URL='${NEXT_PUBLIC_API_BASE_URL}' \
+  --build-arg JAVA_API_BASE_URL='${JAVA_API_BASE_URL}' \
+  --build-arg JAVA_OSS_ASSET_BASE_URL='${JAVA_OSS_ASSET_BASE_URL}' \
+  --build-arg PYTHON_API_BASE_URL='${PYTHON_API_BASE_URL}' \
+  --build-arg H5_BFF_LOG_BACKEND_RESPONSE='${H5_BFF_LOG_BACKEND_RESPONSE}' \
+  --build-arg H5_BFF_BACKEND_RESPONSE_LOG_LIMIT='${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT}' \
   --build-arg NEXT_PUBLIC_CONFIG_API_BASE_URL='/' \
   --build-arg NEXT_PUBLIC_H5_MANIFEST_URL='/api/h5/manifest/active?environment=prod' \
   --build-arg H5_MANIFEST_URL='http://127.0.0.1:4100/api/h5/manifest/active?environment=prod' \
@@ -377,6 +421,14 @@ docker run -d \
   -e H5_RELEASE_VARIANT='${H5_RELEASE_VARIANT}' \
   -e H5_BASE_PATH='${H5_BASE_PATH}' \
   -e NEXT_PUBLIC_H5_BASE_PATH='${H5_BASE_PATH}' \
+  -e APP_ENV='${APP_ENV}' \
+  -e NEXT_PUBLIC_APP_ENV='${NEXT_PUBLIC_APP_ENV}' \
+  -e NEXT_PUBLIC_API_BASE_URL='${NEXT_PUBLIC_API_BASE_URL}' \
+  -e JAVA_API_BASE_URL='${JAVA_API_BASE_URL}' \
+  -e JAVA_OSS_ASSET_BASE_URL='${JAVA_OSS_ASSET_BASE_URL}' \
+  -e PYTHON_API_BASE_URL='${PYTHON_API_BASE_URL}' \
+  -e H5_BFF_LOG_BACKEND_RESPONSE='${H5_BFF_LOG_BACKEND_RESPONSE}' \
+  -e H5_BFF_BACKEND_RESPONSE_LOG_LIMIT='${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT}' \
   -p "127.0.0.1:\${selected_port}:3109" \
   '${H5_IMAGE}' >/dev/null
 
