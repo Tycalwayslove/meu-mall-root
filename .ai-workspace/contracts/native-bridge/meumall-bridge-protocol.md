@@ -193,6 +193,7 @@ App 必须提供：
 | 关闭 WebView | `rpc/closeWebView` 或 `router/back` | H5 -> Native | 关闭当前页面。 | `history.back()`。 |
 | 请求登录 | `event/need_login` | H5 -> Native | H5 发现未登录时请求原生登录。 | 展示未登录状态。 |
 | 切换一级 tab | `router/navigate` route=`tab` | H5 -> Native | H5 请求原生切 tab。 | H5 路由跳转。 |
+| 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`login`。 | 业务自行决定 H5 fallback。 |
 
 ### P2：后续高风险能力
 
@@ -283,6 +284,38 @@ H5 处理：
 | `back` | 无 | App | 原生页面栈返回。 |
 | `product_detail` | `{ id: string }` | H5 | 打开商品详情。 |
 | `webview` | `{ url: string }` | App 容器 | 打开站内 H5 URL。 |
+| `<native-page>` | 可选 | App 原生页 | 打开对应原生页面。原生页不再使用 `route=native_page` + `params.name` 包装；页面名直接作为 `route`。 |
+
+#### 原生页 route 直出规则
+
+`<native-page>` 不是字面量 route，而是表示“由 App 原生实现的页面名”。H5 打开设置页时，正式信封为：
+
+```json
+{
+  "module": "router",
+  "action": "navigate",
+  "payload": {
+    "route": "settings"
+  }
+}
+```
+
+旧讨论稿中的以下格式后续不再由 H5 主动发送：
+
+```json
+{
+  "module": "router",
+  "action": "navigate",
+  "payload": {
+    "route": "native_page",
+    "params": {
+      "name": "settings"
+    }
+  }
+}
+```
+
+App dispatcher 需要直接按 `payload.route` 分发原生页，例如 `settings` 打开设置页、`address` 打开地址页；`payload.params` 只承载页面参数，不再承载目标页名称。
 
 ### `event/token_expired`
 

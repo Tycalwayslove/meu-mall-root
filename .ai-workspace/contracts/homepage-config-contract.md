@@ -155,6 +155,10 @@ POST /api/home/configs/{id}/publish
 
 ## H5 接口
 
+> 当前状态：该接口属于早期“首页模块配置”方案，不再作为 H5 获取当前版本或首页首屏数据的入口。
+> 获取当前 H5 active 版本请使用 `GET /api/h5/manifest/active?environment=prod`。
+> 首页真实数据请通过 H5 BFF `GET /api/bff/home` 获取。
+
 ### 获取当前 active 首页配置
 
 ```http

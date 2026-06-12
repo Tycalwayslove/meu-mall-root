@@ -24,7 +24,7 @@
   -> Java / Python 后端
 ```
 
-也就是说，浏览器端页面不直接持有 token，也不直接请求 Java / Python 后端。浏览器只请求 H5 自己的 `/api/bff/**`。H5 BFF 在服务端读取 Cookie，然后转成后端需要的 `Authorization: Bearer <token>`。
+也就是说，浏览器端页面不直接持有 token，也不直接请求 Java / Python 后端。浏览器只请求 H5 自己的 `/api/bff/**`。H5 BFF 在服务端读取 Cookie，然后转成后端需要的 `Authorization` header：Python 使用 `Authorization: Bearer <pythonToken>`，Java / mall 使用 `Authorization: <mallToken>`。
 
 这个方向是对的。接下来要做的是把它从“能请求”升级为“可治理、可联调、可定位、可演进”。
 

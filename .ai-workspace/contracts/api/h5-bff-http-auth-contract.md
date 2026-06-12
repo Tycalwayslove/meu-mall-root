@@ -12,7 +12,7 @@
 
 ## 背景
 
-MeuMall 登录在原生 App 中完成。H5 WebView 打开时，原生 App 通过 Cookie 将登录态传给 H5。Python 和 Java 后端现阶段都只支持 `Authorization: Bearer <token>` 鉴权，不支持 Cookie 鉴权。
+MeuMall 登录在原生 App 中完成。H5 WebView 打开时，原生 App 通过 Cookie 将登录态传给 H5。Python 和 Java 后端现阶段都只支持 `Authorization` header 鉴权，不支持 Cookie 鉴权。其中 Python 使用 `Authorization: Bearer <token>`，Java / mall 使用 `Authorization: <token>`，不拼接 `Bearer`。
 
 本契约定义：Cookie 只作为 App 到 H5 服务端的登录态传递方式；H5 服务端调用后端时必须转换为 Authorization header。
 
@@ -47,14 +47,27 @@ MeuMall 登录在原生 App 中完成。H5 WebView 打开时，原生 App 通过
 ## BFF 到后端请求规则
 
 - H5 BFF 从 Cookie 读取 `pythonToken` 和 `mallToken`。
-- 调 Python 后端时使用 `pythonToken`。
-- 调 Java / mall 后端时使用 `mallToken`。
+- 调 Python 后端时使用 `pythonToken`，header 为 `Authorization: Bearer <pythonToken>`。
+- 调 Java / mall 后端时使用 `mallToken`，header 为 `Authorization: <mallToken>`，不拼接 `Bearer`。
+- 调 Java / mall 后端时必须额外注入 `source: 1`。Java 来源枚举为 `1-app`、`2-小程序`、`3-h5`；当前 H5 运行在 App WebView 内，因此按 App 来源传 `1`。
 - `statusHeight` 不参与鉴权，只用于 H5 顶部安全区和调试展示。
+- 本地开发允许 `APP_ENV=local` 时使用工作区根目录 `.env.local` 或 `hybird-meumall/.env.local` 中的 `H5_LOCAL_PYTHON_TOKEN` / `H5_LOCAL_JAVA_TOKEN` 作为 Cookie 缺失时的临时兜底；测试和正式环境必须忽略该兜底。
 - 当接口需要登录态但 Cookie 缺失时，BFF 不请求后端，直接返回 `TOKEN_MISSING`。
-- BFF 调用 Python / Java 后端时注入：
+- BFF 调用 Python 后端时注入：
 
 ```http
-Authorization: Bearer <token>
+Authorization: Bearer <pythonToken>
+x-request-id: <request-id>
+x-h5-version: <h5-version>
+x-app-env: <test|prod>
+x-route: <h5-route>
+```
+
+BFF 调用 Java / mall 后端时注入：
+
+```http
+Authorization: <mallToken>
+source: 1
 x-request-id: <request-id>
 x-h5-version: <h5-version>
 x-app-env: <test|prod>
@@ -115,8 +128,21 @@ Java / Python 后端第一阶段建议做到：
 | `APP_ENV` | 否 | 当前运行环境，建议 `test` 或 `prod`。 |
 | `JAVA_API_BASE_URL` | 否 | Java 后端 base URL。 |
 | `PYTHON_API_BASE_URL` | 否 | Python 后端 base URL。 |
+| `H5_LOCAL_JAVA_TOKEN` | 否 | 本地开发可选，仅 `APP_ENV=local` 且 `mallToken` Cookie 缺失时使用。 |
+| `H5_LOCAL_PYTHON_TOKEN` | 否 | 本地开发可选，仅 `APP_ENV=local` 且 `pythonToken` Cookie 缺失时使用。 |
+| `H5_BFF_LOG_BACKEND_RESPONSE` | 否 | 是否打印 Java / Python 后端响应 body 快照，`1/true` 打开，正式环境默认关闭。 |
+| `H5_BFF_BACKEND_RESPONSE_LOG_LIMIT` | 否 | 后端响应 body 日志长度上限，默认 `30000`。 |
 | `H5_VERSION` | 否 | 当前 H5 版本。 |
 | `NEXT_PUBLIC_H5_BASE_PATH` | 是 | 可选，浏览器端 BFF 路径辅助；缺省时从 location 推导。 |
+
+当前联调域名：
+
+| 后端 | 当前测试 base URL |
+| --- | --- |
+| Java | `https://test.aigcpop.com/mini_h5` |
+| Python | `https://test.aigcpop.com/api` |
+
+`hybird-meumall/config/env/h5.prod.env` 当前只是正式环境配置占位；在正式服务器和域名完成前，它仍按要求指向上述测试域名。
 
 ## BFF 响应结构
 
@@ -156,6 +182,16 @@ type H5BffResult<T> =
 - 该能力仅限内部开发和联调环境。
 - 后续正式业务上线前必须删除面板，或增加服务端开关禁止外部环境访问。
 - Cookie 完整值不得进入日志、埋点和长期文档截图。
+
+## BFF 后端调用日志
+
+H5 BFF 后端调用日志使用 `[h5-bff-backend-call]`。本地和测试环境可以开启 `H5_BFF_LOG_BACKEND_RESPONSE=1`，同一条日志会包含：
+
+- `requestUrl`、`requestHeaders`、`requestBody`：BFF 发给后端的请求快照。
+- `responseBody`、`responseBodySize`、`responseBodyTruncated`：后端原始响应快照。
+- `backendBusinessCode`、`backendBusinessMessage`、`backendBusinessSuccess`：从 Java / Python envelope 中提取的业务状态。
+
+`Authorization`、Cookie、token、secret、mobile、phone、address 等字段必须掩码。正式环境默认关闭 `responseBody` 日志；如需短期排查，必须控制采集范围和保留时长。
 
 ## 错误码
 

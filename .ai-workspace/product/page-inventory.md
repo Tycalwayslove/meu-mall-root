@@ -2,13 +2,15 @@
 
 ## 状态
 
-draft
+draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 
 ## 来源
 
 - Figma：`喵呜APP`
 - 文件 key：`bNdmC9k76qgoZtYCdYSemL`
 - 初扫日期：2026-06-01
+- 最近同步：2026-06-12
+- 飞书知识库链接：<https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre>
 
 ## 说明
 
@@ -25,7 +27,10 @@ draft
 - 达人和会员是一套体系。
 - 智能体由 App 原生负责，当前 H5 不开发智能体具体功能。
 - 首页全部由 H5 承载，消息入口也按 H5 处理。
-- 我的页面除设置外，其它二级页面暂定都是 H5。
+- 我的页面除设置外，其它二级页面暂定都是 H5；设置入口通过 Native Bridge 发送 `router/navigate route=settings`，由 App 打开原生设置页。
+- H5 原生页跳转不再使用 `route=native_page + params.name`，而是直接用原生页面名作为 `payload.route`。
+- 商品详情当前已接入普通商品 + 快递 + SKU + 立即购买 + 订单确认；秒杀、拼团、自提、同城、正式下单和支付后置。
+- 首页首批真实接口已接入 H5 BFF；商品详情和订单确认首批真实链路已接入 H5 BFF；个人中心二级页当前为静态高保真 mock 页面。
 - 当前 Figma 先按实验稿推进，后续逐页确认正式页面。
 
 已确认决策详见 `.ai-workspace/product/product-decisions.md`。
@@ -41,12 +46,74 @@ draft
 
 | 页面 | 主要元素 | 入口 | 跳转目标 | 建议归属 | 登录 | 缓存/交易备注 | 待确认 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 首页 | logo、搜索、消息、banner、分类入口、限时秒杀、推广带货、推荐商品、底部 Tab | App 启动后主入口 | 搜索、消息、分类、秒杀、推广、商品详情 | Hybrid：Tab 原生，内容 H5 | 是 | 公共内容可缓存；推荐商品价格需实时校验；接口统一带 token | 首页全部 H5；消息入口 H5 |
+| 首页 | logo、搜索、消息、banner、分类入口、限时秒杀、推广带货、推荐商品、底部 Tab | App 启动后主入口 | 搜索、消息、分类、秒杀、推广、商品详情 | Hybrid：Tab 原生，内容 H5 | 是 | 公共内容可缓存；推荐商品价格需实时校验；接口统一带 token | 已接 H5 BFF `/api/bff/home`，首页核心调 Java `/p/app/home/index` |
+| 相似推荐商品 | 常规导航、搜索栏、筛选条件、推荐商品列表 | 首页“为您推荐”右侧“更多” | 商品详情、搜索/筛选结果 | H5 | 是 | 商品基础信息可短缓存；价格、优惠、佣金和可购买状态需实时或短 TTL；接口统一带 token | 已实现 `/home/recommend-products`，使用 `/api/bff/home/for-you-products` -> Java `/p/app/home/forYouProds` |
 | 首页-无 banner | 搜索、分类、秒杀、推广、推荐商品瀑布流 | 首页配置无 banner 时 | 同首页 | H5 | 是 | 同首页 | 只是首页状态，不单独做页面 |
 | 首页-滑动状态 | banner 上滑、搜索栏吸顶或内容滚动状态 | 首页滚动 | 同首页 | H5 | 同首页 | 同首页 | 需要特殊吸顶交互 |
 | 智能体 Tab | AI 角色形象、创建按钮、可能的智能体资料 | 底部 Tab | 创建/查看智能体 | App | 是 | 用户私有内容，不共享缓存 | 智能体已有老项目页面和代码；当前只做 demo 壳子 |
-| 推广 Tab | 达人信息、收益卡、推广工具、商品列表入口 | 底部 Tab | 推广商品、佣金中心、名片、活动 | H5，Tab 容器原生 | 是 | 收益和佣金需 no-store；佣金按 N+1 计算 | 不同等级达人页面样式不同，后续补文档和样式图 |
-| 我的 Tab | 用户信息、功能入口、收藏、订单/记录、会员或设置入口 | 底部 Tab | 收藏、会员、收益、设置等 | Hybrid：Tab 原生，内容 H5 | 是 | 用户私有内容默认 no-store，可弱快照 | 除设置外，其它二级页面暂定 H5 |
+| 推广 Tab | 达人信息、收益卡、推广工具、商品列表入口 | 底部 Tab | 推广商品、佣金中心、名片、活动 | H5，Tab 容器原生 | 是 | 收益和佣金需 no-store；佣金按 N+1 计算 | 已完成首批静态/Mock 高保真，真实接口后置 |
+| 我的 Tab | 用户信息、钱包/优惠券/足迹入口、收藏、订单、服务工具、设置入口 | 底部 Tab | 钱包、优惠券、足迹、收藏、订单、消息、客服、设置 | Hybrid：Tab 原生，内容 H5 | 是 | 用户私有内容默认 no-store，可弱快照 | `/mine` 已高保真；设置由 App 原生承载，二级页真实接口后置 |
+
+## 当前 H5 实际路由清单
+
+本节以 `hybird-meumall/src/app` 实际存在的 App Router 路由为准，作为飞书知识库和排期表的当前事实源。
+
+### Tab 与通用页面
+
+| 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| `/` | 首页 | 已接真实 BFF + fallback | Java `/p/app/home/index`，推荐分页接口 | Tab 根 WebView | 推荐商品可下滑加载更多 |
+| `/home/recommend-products` | 相似推荐商品 | 已接真实 BFF + fallback | Java `/p/app/home/forYouProds` | 新 H5 WebView | 从首页“更多”进入 |
+| `/mine` | 我的 | 已高保真 | 本地 mock | Tab 根 WebView | V1-V5 达人等级图片徽章已接入 |
+| `/category` | 分类 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 真实分类接口待接 |
+| `/search` | 搜索 | 静态高保真 / mock | 本地 mock | 当前或新 H5 WebView | 搜索真实接口待接 |
+| `/search/ranking` | 搜索热榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 热榜接口待接 |
+| `/messages` | 消息中心 | 静态占位 | 本地 mock | 新 H5 WebView | 消息真实接口待接 |
+| `/consult` | 咨询入口 | 静态占位 | 本地 mock | 新 H5 WebView | 是否接 IM / 客服待确认 |
+| `/seckill` | 限时秒杀 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 秒杀真实接口后置 |
+
+### 商品、交易与个人中心
+
+| 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| `/product/[id]` | 商品详情 | 普通商品真实链路已接入 | BFF `/api/bff/product-detail` -> Java `/prod/prodInfo`，辅助聚合评论/店铺接口 | 新 H5 WebView | 支持普通商品、快递、SKU、立即购买、富文本、视频/图片轮播 |
+| `/order-confirm` | 订单确认 | 真实商品参数实时校验已接入 | BFF `/api/bff/order-confirm` 重新校验商品/SKU/库存/价格 | 当前 WebView push | 正式下单和支付未接 |
+| `/wallet` | 钱包 | 静态高保真 | 本地 mock | 新 H5 WebView | 结算 tab 为页面内 state，不改 URL |
+| `/favorites/products` | 我的收藏-商品 | 静态高保真 | 本地 mock | 新 H5 WebView | 支持编辑态，全选/删除为本地交互 |
+| `/favorites/shops` | 我的收藏-店铺 | 静态占位 / 低保真 | 本地 mock | 新 H5 WebView | 店铺收藏高保真和接口待补 |
+| `/footprints` | 我的足迹 | 静态高保真 | 本地 mock | 新 H5 WebView | 复用收藏横向商品卡 |
+| `/coupons` | 我的优惠券 | 静态高保真 | 本地 mock | 新 H5 WebView | 优惠券领取/使用接口待接 |
+| `/orders` | 订单列表 | 静态高保真 | 本地 mock | 新 H5 WebView | 支持状态 tab 和空态；订单真实接口待接 |
+| 原生 `settings` | 设置页 | App 原生承载 | App | native-page | H5 发送 `router/navigate route=settings` |
+
+### 推广、达人与活动
+
+| 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| `/promotion` | 推广首页 | 已高保真 / mock | 本地 mock | Tab 根 WebView | V1-V5 达人主题和本地资源已接入 |
+| `/promotion/products` | 推广商品 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | “推广”按钮已接 `event/share` |
+| `/promotion/commission` | 佣金收益 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 佣金真实字段待确认 |
+| `/promotion/card` | 我的名片 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 保存图片/分享需 App 能力 |
+| `/promotion/activities` | 活动中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 活动接口待接 |
+| `/promotion/activities/[slug]` | 活动详情 | 静态高保真 / mock | 本地 mock | 当前 WebView push | 从活动中心进入 |
+| `/promotion/activities/reward-records` | 奖励记录 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 复用浅绿顶部背景 |
+| `/promotion/benefits` | 权益中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 支持 V1-V5 切换动画 |
+| `/promotion/level` | 达人等级 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 等级规则接口待确认 |
+| `/promotion/rank-center` | 榜单中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 入口页 |
+| `/promotion/ranking` | 达人排行榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 默认榜单 |
+| `/promotion/ranking/sales` | 达人销量榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | Figma 样式已重做 |
+| `/promotion/ranking/amount` | 达人销售额榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | Figma 样式已重做 |
+
+### BFF 与运行时接口
+
+| 路由 | 用途 | 当前状态 | 后端依赖 | 备注 |
+| --- | --- | --- | --- | --- |
+| `/api/health` | SSR 健康检查 | 已实现 | 无 | 发布 smoke 使用 |
+| `/api/bff/home` | 首页核心数据 | 已实现 | Java `/p/app/home/index` | 依赖 `mallToken` |
+| `/api/bff/home/recommend-products` | 首页推荐商品分页 | 已实现 | Java `/p/app/home/recommendProds` | 首页底部加载更多 |
+| `/api/bff/home/for-you-products` | 相似推荐商品分页 | 已实现 | Java `/p/app/home/forYouProds` | `/home/recommend-products` 使用 |
+| `/api/bff/product-detail` | 商品详情聚合 | 已实现 | Java `/prod/prodInfo`、评论/店铺辅助接口 | 只读聚合，辅助接口失败不拖垮主数据 |
+| `/api/bff/order-confirm` | 订单确认实时校验 | 已实现 | 商品详情 BFF / Java 商品详情 | 不执行正式下单 |
 
 ## 商品与活动
 
@@ -110,9 +177,11 @@ flowchart TD
   Auth --> Home
 
   Home --> Search["搜索/分类结果"]
+  Home --> RecommendProducts["相似推荐商品"]
   Home --> Seckill["限时秒杀"]
   Home --> Promotion["推广"]
   Home --> Product["商品详情"]
+  RecommendProducts --> Product
   Search --> Product
   Seckill --> Product
 

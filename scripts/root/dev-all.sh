@@ -4,10 +4,31 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT_DIR}/scripts/root/dev-lib.sh"
 
+H5_ENV="${H5_ENV:-local}"
+H5_ENV_FILE="${H5_ENV_FILE:-${ROOT_DIR}/hybird-meumall/config/env/h5.${H5_ENV}.env}"
+
+if [ -f "${H5_ENV_FILE}" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "${H5_ENV_FILE}"
+  set +a
+else
+  echo "H5 env file not found: ${H5_ENV_FILE}; falling back to inline defaults." >&2
+fi
+
+for local_env_file in "${ROOT_DIR}/.env.local" "${ROOT_DIR}/hybird-meumall/.env.local"; do
+  if [ -f "${local_env_file}" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "${local_env_file}"
+    set +a
+  fi
+done
+
 SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 SERVER_PORT="${SERVER_PORT:-4100}"
 H5_HOST="${H5_HOST:-localhost}"
-H5_PORT="${H5_PORT:-3109}"
+H5_PORT="${H5_PORT:-${PORT:-3109}}"
 ADMIN_HOST="${ADMIN_HOST:-localhost}"
 ADMIN_PORT="${ADMIN_PORT:-5173}"
 H5_BASE_PATH="${H5_BASE_PATH:-/hybird}"
@@ -16,8 +37,8 @@ ENVIRONMENT="${ENVIRONMENT:-prod}"
 SERVER_URL="$(service_url "${SERVER_HOST}" "${SERVER_PORT}" "/api/health")"
 H5_URL="$(service_url "${H5_HOST}" "${H5_PORT}" "${H5_BASE_PATH}")"
 ADMIN_URL="$(service_url "${ADMIN_HOST}" "${ADMIN_PORT}" "/")"
-MANIFEST_URL="http://${SERVER_HOST}:${SERVER_PORT}/api/h5/manifest/active?environment=${ENVIRONMENT}"
-CONFIG_API_BASE_URL="http://${SERVER_HOST}:${SERVER_PORT}"
+MANIFEST_URL="${H5_MANIFEST_URL:-http://${SERVER_HOST}:${SERVER_PORT}/api/h5/manifest/active?environment=${ENVIRONMENT}}"
+CONFIG_API_BASE_URL="${NEXT_PUBLIC_CONFIG_API_BASE_URL:-${H5_RELEASE_SERVER_URL:-http://${SERVER_HOST}:${SERVER_PORT}}}"
 
 STARTED_PIDS=()
 STARTED_NAMES=()
@@ -139,6 +160,7 @@ start_h5() {
 
   if [ "${decision}" = "reuse" ]; then
     echo "Reusing hybird-meumall on ${H5_URL}"
+    echo "Note: restart the existing H5 dev server if you need to apply ${H5_ENV_FILE}."
     return 0
   fi
 
@@ -151,11 +173,22 @@ start_h5() {
   (
     cd "${ROOT_DIR}/hybird-meumall"
     exec env \
+      APP_ENV="${APP_ENV:-${H5_ENV}}" \
+      NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-${APP_ENV:-${H5_ENV}}}" \
+      NEXT_PUBLIC_H5_VERSION="${NEXT_PUBLIC_H5_VERSION:-}" \
       H5_BASE_PATH="${H5_BASE_PATH}" \
-      NEXT_PUBLIC_H5_BASE_PATH="${H5_BASE_PATH}" \
+      NEXT_PUBLIC_H5_BASE_PATH="${NEXT_PUBLIC_H5_BASE_PATH:-${H5_BASE_PATH}}" \
+      H5_SERVICE_BASE_URL="${H5_SERVICE_BASE_URL:-}" \
+      H5_RELEASE_SERVER_URL="${H5_RELEASE_SERVER_URL:-${CONFIG_API_BASE_URL}}" \
       H5_MANIFEST_URL="${MANIFEST_URL}" \
-      NEXT_PUBLIC_H5_MANIFEST_URL="${MANIFEST_URL}" \
+      NEXT_PUBLIC_H5_MANIFEST_URL="${NEXT_PUBLIC_H5_MANIFEST_URL:-${MANIFEST_URL}}" \
       NEXT_PUBLIC_CONFIG_API_BASE_URL="${CONFIG_API_BASE_URL}" \
+      NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-/api/bff}" \
+      H5_HEALTH_CHECK_PATH="${H5_HEALTH_CHECK_PATH:-/api/health}" \
+      H5_RELEASE_VARIANT="${H5_RELEASE_VARIANT:-}" \
+      H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-}" \
+      JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-}" \
+      PYTHON_API_BASE_URL="${PYTHON_API_BASE_URL:-}" \
       pnpm exec next dev -H "${H5_HOST}" -p "${H5_PORT}"
   ) &
   remember_started "hybird-meumall" "$!"
@@ -222,5 +255,8 @@ echo "Local services:"
 echo "- server: ${SERVER_URL}"
 echo "- h5:     ${H5_URL}"
 echo "- admin:  ${ADMIN_URL}"
+echo "- h5 env: ${H5_ENV} (${H5_ENV_FILE})"
+echo "- java:   ${JAVA_API_BASE_URL:-not configured}"
+echo "- python: ${PYTHON_API_BASE_URL:-not configured}"
 
 monitor_started_services
