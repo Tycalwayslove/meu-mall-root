@@ -194,6 +194,7 @@ App 必须提供：
 | 请求登录 | `event/need_login` | H5 -> Native | H5 发现未登录时请求原生登录。 | 展示未登录状态。 |
 | 切换一级 tab | `router/navigate` route=`tab` | H5 -> Native | H5 请求原生切 tab。 | H5 路由跳转。 |
 | 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`login`。 | 业务自行决定 H5 fallback。 |
+| 地址管理 | `rpc/address.*` | H5 -> Native | H5 商品详情、订单确认和地址管理页优先通过 App 获取/管理地址。 | 回退 H5 BFF `/api/bff/address/*`。 |
 
 ### P2：后续高风险能力
 
@@ -205,6 +206,66 @@ App 必须提供：
 | 定位 | 涉及隐私、授权、城市和坐标精度。 | 是 |
 | 剪贴板 | 涉及隐私提示和平台限制。 | 是 |
 | 打开外部 App | 涉及 URL scheme 白名单。 | 是 |
+
+## 地址 Bridge 能力
+
+### 背景
+
+旧 uni-app 地址模块依赖小程序/uni 运行时。当前 H5 运行在 App WebView 内，商品详情配送地址、订单确认默认地址和地址管理页应优先通过 App Native Bridge 获取和管理地址；H5 BFF 继续保留为老版本 App 和本地浏览器兜底，同时订单确认/提交 BFF 必须用 Java 地址接口做服务端校验。
+
+### Action 表
+
+| action | payload | resolve data | 用途 |
+| --- | --- | --- | --- |
+| `address.getDefault` | 无 | `{ "address": Address \| null }` | 商品详情配送行、订单确认默认地址。 |
+| `address.getList` | 无 | `{ "addresses": Address[] }` | `/address` 地址列表。 |
+| `address.getInfo` | `{ "addrId": "3001" }` | `{ "address": Address \| null }` | `/address/edit` 编辑回填。 |
+| `address.save` | `Address` | `{ "addrId": "3001", "message": "地址已保存" }` | 新增/编辑地址。 |
+| `address.setDefault` | `{ "addrId": "3001" }` | `{ "message": "默认地址已更新" }` | 设置默认地址。 |
+| `address.delete` | `{ "addrId": "3001" }` | `{ "message": "地址已删除" }` | 删除地址。 |
+| `address.chooseLocation` | 无 | `{ "location": AddressLocation \| null }` | 定位选点预留；App 后续接入真实定位/地图选点。 |
+
+### Address 字段
+
+```ts
+type Address = {
+  addr?: string;
+  addrId?: string | number;
+  area?: string;
+  areaId?: string | number;
+  city?: string;
+  cityId?: string | number;
+  commonAddr?: 0 | 1 | "0" | "1" | boolean;
+  lat?: string | number;
+  lng?: string | number;
+  mobile?: string;
+  province?: string;
+  provinceId?: string | number;
+  receiver?: string;
+};
+```
+
+```ts
+type AddressLocation = {
+  addr?: string;
+  area?: string;
+  areaId?: string | number;
+  city?: string;
+  cityId?: string | number;
+  lat?: string | number;
+  lng?: string | number;
+  name?: string;
+  province?: string;
+  provinceId?: string | number;
+};
+```
+
+### H5 兜底规则
+
+- Bridge 不可用、超时、`unsupported` 或 `invalid_payload` 时，H5 回退 `/api/bff/address/*`。
+- `address.chooseLocation` 是定位能力预留，不回退 BFF；App 未接入时 H5 显示提示，并输出 `[MeuMall][address-location]` console 日志。
+- 订单确认和提交不能只信任 Bridge 返回的地址快照；BFF 仍会调用 Java `/p/address/addrInfo/{addrId}` 校验地址存在性。
+- App debug receiver 仅证明 RPC 通道可用，地址列表/详情返回空，不内置调试收货地址。
 
 ## 首批能力明细
 

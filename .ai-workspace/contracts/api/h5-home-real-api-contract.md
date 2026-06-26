@@ -40,6 +40,13 @@ folderId: 87570137
 
 也就是说，`recommendProds` 是首页首屏推荐商品流，`forYouProds` 是“相似推荐商品”更多页的商品流。两个接口都带分页参数，但消费场景不同，不能在 H5 中混用。
 
+`/p/app/home/index` 当前 Apifox 描述已明确：
+
+- `banners`：首页 banner，`imgType=0`，`position` 为 `0` / `1` / `null`，不含个人中心 `position=2`。
+- `navList`：首页导航入口列表，包含热门商品入口、分类搜索入口和更多分类入口；H5 分类区直接按该数组展示，不再拼接 `hotCategory + categoryTop8`。
+- `seckillModule`：可购秒杀池，无商品时为 `null`。
+- 首页“限时秒杀”和“推广带货”入口卡是 H5 页面固定 UI，不再由首页聚合接口或后台配置控制；入口分别固定跳转 `/seckill` 和 `/promotion/products`。
+
 ## 适用环境
 
 - H5 BFF 通过 `JAVA_API_BASE_URL` 访问 Java 后端。
@@ -60,6 +67,7 @@ type HomeBffData = {
   view: HomeExperienceData;
   modules: {
     banners: AppBannerVO[];
+    navList: AppHomeNavVO[];
     hotCategory: ProdRankGroupDto | null;
     categoryTop8: CategoryDto[];
     seckillModule: AppSeckillModuleVO | null;
@@ -196,6 +204,7 @@ GET /p/app/home/index
 ```ts
 type AppHomeVO = {
   banners?: AppBannerVO[];
+  navList?: AppHomeNavVO[];
   hotCategory?: ProdRankGroupDto | null;
   categoryTop8?: CategoryDto[];
   seckillModule?: AppSeckillModuleVO | null;
@@ -235,6 +244,7 @@ type ProdRankGroupDto = {
   rankType?: number;
   rankName?: string;
   categoryId?: number;
+  icon?: string;
   top3?: ProdRankProdDto[];
   [futureField: string]: unknown;
 };
@@ -263,7 +273,22 @@ type CategoryDto = {
 };
 ```
 
-H5 初始映射：
+H5 分类入口映射：
+
+```text
+navType=1 -> /search/ranking
+navType=2 -> /search?categoryId=<categoryId>
+navType=3 -> /category
+```
+
+规则：
+
+- `navList` 顺序由 Java 返回决定，H5 不再根据旧字段二次拼接或补齐。
+- `navType=1` 使用 `title` 展示，图标按首页图片 URL 规则处理，点击进入完整热榜。
+- `navType=2` 需要 `categoryId`，展示 `title` / `keyword`，点击进入搜索结果页并携带 `categoryId`。
+- `navType=3` 展示“更多分类”等 Java 返回标题，点击进入 `/category`。
+- 缺少标题、未知 `navType` 或分类入口缺少 `categoryId` 的项不进入 H5 视图模型。
+- `hotCategory`、`categoryTop8` 如后端仍返回，仅保留在 `modules` 便于调试，不参与首页分类展示。
 
 ```text
 /search?categoryId=<categoryId>
@@ -289,10 +314,13 @@ type AppSeckillItemVO = {
 };
 ```
 
-H5 初始映射：
+H5 使用口径：
 
-- 秒杀模块存在且有商品时：首页活动卡继续指向 `/seckill`。
-- 秒杀商品可作为推荐商品补位或后续秒杀页数据源。
+- 首页聚合接口仍保留 `seckillModule` 到 `modules`，便于后续联调查看后端秒杀池字段。
+- 首页“限时秒杀”入口卡不再依赖 `seckillModule` 是否存在，也不依赖后台活动配置，H5 固定展示并跳转 `/seckill`。
+- 首页“推广带货”入口卡不来自 `/p/app/home/index`，H5 固定展示并跳转 `/promotion/products`。
+- `/seckill` 页面商品列表通过 `/api/bff/seckill/products` -> Java `/p/app/home/seckillProds` 独立获取。
+- `/promotion/products` 页面商品列表通过 `/api/bff/promotion/products` -> Java `/p/distribution/prod/productPage` 独立获取。
 
 ## 图片 URL 处理
 
@@ -303,7 +331,7 @@ H5 初始映射：
 | `https://cdn.example.com/a.png` | 原样使用。 |
 | `banner/a.png` | 拼接为 `JAVA_OSS_ASSET_BASE_URL + banner/a.png`。 |
 | `/banner/a.png` | 去掉开头 `/` 后拼接为 `JAVA_OSS_ASSET_BASE_URL + banner/a.png`。 |
-| 空值 | 使用 H5 fallback 图片或不展示图片。 |
+| 空值 | 不展示对应业务图片；不得用本地 mock 图片补齐业务内容。 |
 
 当前联调环境：
 
@@ -420,19 +448,19 @@ type H5BffResult<T> =
 - Java 后端 HTTP 200 但 body 为 `success:false / code:A00004`：BFF 转为 `AUTH_FAILED`，浏览器端收到 HTTP 401。
 - Java 后端 HTTP 200 但 body 为 `success:false / code:A00005`：BFF 转为 `HTTP_ERROR`，浏览器端按可恢复后端错误处理。
 - 网络失败或超时：BFF 返回 `NETWORK_ERROR` 或 `TIMEOUT`。
-- 字段缺失：H5 mapper 使用安全默认值，必要时回落到本地静态数据。
+- 字段缺失：H5 mapper 使用安全空值；banner、分类和推荐商品不得回落到本地静态业务数据。首页“限时秒杀/推广带货”是固定 UI 入口，不属于 Java 业务数据兜底。
 
 ## 兼容性要求
 
 - H5 不依赖后端新增字段。
-- 图片 URL 可以为空，H5 用占位图兜底。
+- 图片 URL 可以为空，对应业务图片不展示或使用组件级非业务占位；不得使用 mock 业务图。
 - 推荐商品为空时，H5 不崩溃。
 
 ## 测试方式
 
-- Mapper 单测覆盖 banner、分类、秒杀和推荐商品映射。
+- Mapper 单测覆盖 banner、`navList` 分类、固定活动入口和推荐商品映射；分类必须覆盖 `navList` 直接展示、不同 `navType` 路由和旧 `hotCategory/categoryTop8` 不再拼接；活动入口必须覆盖 Java 首页聚合缺少活动/秒杀数据时仍展示固定入口。
 - BFF service 单测覆盖：首屏聚合接口只请求 `/p/app/home/index`；首页推荐分页接口按 `current/size` 请求 `/p/app/home/recommendProds`；“相似推荐商品”页面分页接口按 `current/size` 请求 `/p/app/home/forYouProds`。
-- 首页组件测试覆盖接口成功和失败 fallback。
+- 首页组件测试覆盖接口成功和失败错误态；失败时不展示本地 mock 首页业务数据。
 - 推荐更多入口测试覆盖首页“更多”跳转 `/home/recommend-products`。
 - 首页和相似推荐商品页测试覆盖 `current + 1` 加载下一页并追加商品，首页测试同时覆盖加载后显示回顶入口。
 
@@ -447,4 +475,4 @@ type H5BffResult<T> =
 
 ## 回滚方式
 
-H5 可回滚到上一版 active manifest。接口失败时当前版本也会回落到本地静态首页数据。
+H5 可回滚到上一版 active manifest。接口失败时当前版本展示错误/空业务态，不回落到本地静态业务数据；首页固定活动入口随页面版本回滚。

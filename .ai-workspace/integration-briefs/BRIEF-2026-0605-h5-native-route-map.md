@@ -193,6 +193,140 @@ when (route) {
 | 旧格式兼容 | 如 App 需要过渡兼容，可保留 `route=native_page` 分支，但 H5 不再主动发送 |
 | 未知原生页 route | App 记录日志、进入兜底分发或返回 unsupported，不影响 WebView 稳定性 |
 
+## 2026-06-24 Bridge 协议变更记录：地址能力 RPC
+
+这次修改影响的是商品详情、订单确认和地址管理页的数据来源，不只是新增几个 H5 页面。旧小程序里的地址能力依赖小程序宿主能力和 Java 地址接口；当前 H5 运行在 App WebView 内，地址读取、保存、删除和设默认需要优先通过 App Bridge 获取，H5 BFF 只作为兜底。
+
+### 变更原因
+
+商品详情和下单链路需要在以下场景使用收货地址：
+
+- 商品详情展示当前配送地址，并用地址 ID 请求商品详情接口，保证配送、库存和价格校验有地址上下文。
+- 订单确认页在 URL 没有 `addressId` 时，需要先获取默认地址，再做订单确认校验。
+- 地址列表和新增/编辑页需要支持真实地址管理能力，不能只停留在 H5 mock。
+- 小程序版地址能力依赖小程序环境；App Hybrid 中应由 App 提供地址能力，再由 H5 保留 Java BFF fallback。
+
+因此本次新增 `rpc/address.*` Bridge 能力，H5 地址模块统一先调 App Bridge，Bridge 不可用或返回失败时再降级到 H5 BFF。
+
+### 新增 Bridge RPC
+
+| RPC action | H5 调用场景 | Payload | Response |
+| --- | --- | --- | --- |
+| `address.getDefault` | 商品详情、订单确认默认地址 | 无 | `{ address?: Address \| null }` |
+| `address.getList` | `/address` 地址列表 | 无 | `{ addresses: Address[] }` |
+| `address.getInfo` | `/address/edit?addrId=<id>` 编辑回填 | `{ addrId }` | `{ address?: Address \| null }` |
+| `address.save` | 新增/编辑地址保存 | `Address` | `{ addrId?, address?, message? }` |
+| `address.setDefault` | 地址列表设默认 | `{ addrId }` | `{ message? }` |
+| `address.delete` | 地址列表删除 | `{ addrId }` | `{ message? }` |
+| `address.chooseLocation` | 新增/编辑地址页定位按钮 | 无 | `{ location?: AddressLocation \| null }` |
+
+`Address` 字段口径：
+
+```ts
+type Address = {
+  addrId: string;
+  receiver: string;
+  mobile: string;
+  province: string;
+  city: string;
+  area: string;
+  addr: string;
+  commonAddr?: 0 | 1 | boolean;
+  provinceId?: string | number;
+  cityId?: string | number;
+  areaId?: string | number;
+  lat?: string | number;
+  lng?: string | number;
+};
+```
+
+定位预留返回：
+
+```ts
+type AddressLocation = {
+  addr?: string;
+  area?: string;
+  areaId?: string | number;
+  city?: string;
+  cityId?: string | number;
+  lat?: string | number;
+  lng?: string | number;
+  name?: string;
+  province?: string;
+  provinceId?: string | number;
+};
+```
+
+### H5 当前实现
+
+H5 不直接在业务组件中拼 Bridge envelope，而是统一使用 `createHybridAddressApi()`：
+
+```ts
+const addressApi = createHybridAddressApi({
+  bridge: createWindowProtocolBridge(),
+  fallback: createAddressApi(createH5Client())
+});
+```
+
+调用优先级：
+
+```text
+App Bridge rpc/address.* 成功 -> 使用 Bridge 返回数据
+App Bridge 不可用、未实现或返回失败 -> 回退 H5 BFF /api/bff/address/*
+H5 BFF 再转发旧 Java /p/address/*
+```
+
+对应代码位置：
+
+```text
+hybird-meumall/src/features/mine-secondary/address-hybrid-api.ts
+hybird-meumall/src/features/mine-secondary/components/AddressScreens.tsx
+hybird-meumall/src/features/product/components/ProductDetailScreen.tsx
+hybird-meumall/src/features/product/components/OrderConfirmScreen.tsx
+hybird-meumall/src/lib/bridge/protocol-bridge.ts
+```
+
+### App 侧需要实现的点
+
+| 事项 | App 侧要求 |
+| --- | --- |
+| 默认地址 | 实现 `address.getDefault`，返回当前用户默认地址；无地址时返回 `address: null`。 |
+| 地址列表 | 实现 `address.getList`，返回当前用户地址数组，建议默认地址排在前面。 |
+| 地址详情 | 实现 `address.getInfo`，按 `addrId` 返回地址详情。 |
+| 新增/编辑 | 实现 `address.save`，根据是否带 `addrId` 区分新增或编辑，成功后返回保存后的 `addrId` 或地址对象。 |
+| 设默认 | 实现 `address.setDefault`，按 `addrId` 设置默认地址。 |
+| 删除 | 实现 `address.delete`，删除指定地址；默认地址删除策略由 App/后端业务规则决定。 |
+| 定位选点 | 后续实现 `address.chooseLocation`，返回用户选中的地址、经纬度和省市区；当前 H5 只预留 Bridge 调用并输出日志。 |
+| 错误返回 | 对未登录、无权限、参数非法、接口失败等情况，通过 RPC reject 或错误 envelope 返回，H5 会走 BFF fallback 或展示错误。 |
+| 数据字段 | 至少保证 `addrId`、`receiver`、`mobile`、`province`、`city`、`area`、`addr` 可用。 |
+
+iOS 调试壳当前已补充地址 RPC 的 debug response，用于 H5 联调页面不白屏；正式 App 仍需接真实地址数据源。
+
+### 影响范围
+
+| 影响对象 | 影响说明 |
+| --- | --- |
+| 商品详情 `/product/[id]` | 进入后调用 `address.getDefault`，配送行展示默认地址，并把 `addrId` 带给 `/api/bff/product-detail`。 |
+| 订单确认 `/order-confirm` | URL 未带 `addressId` 时先调用 `address.getDefault`，再请求 `/api/bff/order-confirm`；无地址时禁止提交。 |
+| 地址列表 `/address` | 调用 `address.getList`，失败时回退 H5 BFF；本地 mock 只作为无登录态预览。 |
+| 地址编辑 `/address/edit` | 编辑回填调用 `address.getInfo`，保存调用 `address.save`。 |
+| 定位按钮 | 调用预留 `address.chooseLocation`；App 未接入时 H5 页面提示等待接入，并输出 `[MeuMall][address-location]` console 日志。 |
+| 地址操作 | 设默认和删除分别调用 `address.setDefault`、`address.delete`。 |
+| H5 BFF | `/api/bff/address/*` 保留为 fallback，同时订单确认/提交仍通过 Java `/p/address/addrInfo/{addrId}` 做服务端校验。 |
+
+### 联调验收点
+
+| 验收点 | 期望结果 |
+| --- | --- |
+| 打开商品详情 | App 收到 `rpc/address.getDefault`；商品详情配送行显示默认地址。 |
+| 商品详情重拉商品接口 | H5 BFF `/api/bff/product-detail` query 带解析后的 `addrId`。 |
+| 打开订单确认 | 未带 `addressId` 时 App 收到 `rpc/address.getDefault`；页面展示地址并允许提交。 |
+| 无地址用户 | `address.getDefault` 返回空时，订单确认页展示未选择地址并禁止提交；用户可进入 `/address/edit` 新增。 |
+| 地址列表 | App 收到 `rpc/address.getList`，页面展示真实地址；Bridge 不可用时回退 BFF。 |
+| 新增/编辑地址 | App 收到 `rpc/address.save`，成功后回到地址列表并刷新。 |
+| 设默认/删除 | App 收到 `rpc/address.setDefault` / `rpc/address.delete`，页面刷新或展示错误。 |
+| 定位预留 | 点击定位按钮时，H5 控制台输出 `[MeuMall][address-location] request address.chooseLocation`；App 后续接入后应收到 `rpc/address.chooseLocation`。 |
+
 ## WebView 容器策略说明
 
 | 策略 | 中文说明 | 适用页面 | 返回表现 | 目的 |

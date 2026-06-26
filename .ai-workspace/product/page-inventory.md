@@ -2,14 +2,14 @@
 
 ## 状态
 
-draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
+draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 
 ## 来源
 
 - Figma：`喵呜APP`
 - 文件 key：`bNdmC9k76qgoZtYCdYSemL`
 - 初扫日期：2026-06-01
-- 最近同步：2026-06-12
+- 最近仓库更新：2026-06-25
 - 飞书知识库链接：<https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre>
 
 ## 说明
@@ -29,8 +29,8 @@ draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 - 首页全部由 H5 承载，消息入口也按 H5 处理。
 - 我的页面除设置外，其它二级页面暂定都是 H5；设置入口通过 Native Bridge 发送 `router/navigate route=settings`，由 App 打开原生设置页。
 - H5 原生页跳转不再使用 `route=native_page + params.name`，而是直接用原生页面名作为 `payload.route`。
-- 商品详情当前已接入普通商品 + 快递 + SKU + 立即购买 + 订单确认；秒杀、拼团、自提、同城、正式下单和支付后置。
-- 首页首批真实接口已接入 H5 BFF；商品详情和订单确认首批真实链路已接入 H5 BFF；个人中心二级页当前为静态高保真 mock 页面。
+- 商品详情当前已接入普通商品 + 快递 + SKU + 立即购买 + 订单确认 + 普通快递订单创建；订单确认页加载阶段也会按旧 uni-app 参数调用 Java `/p/order/confirm` 生成确认上下文；秒杀、拼团、自提、同城和支付后置。
+- 首页首批真实接口已接入 H5 BFF，首页类目直接使用 Java `/p/app/home/index` 的 `navList`，不再拼接 `hotCategory/categoryTop8`；商品详情和订单确认首批真实链路已接入 H5 BFF；商品详情、订单确认和地址管理页的地址来源已升级为 App Bridge `rpc/address.*` 优先，H5 BFF/Java 地址接口兜底和服务端校验；个人中心二级页当前多为静态高保真 mock 页面；地址管理已新增列表和新增/编辑页，并接入旧 Java 地址列表、保存、设默认和删除接口。
 - 当前 Figma 先按实验稿推进，后续逐页确认正式页面。
 
 已确认决策详见 `.ai-workspace/product/product-decisions.md`。
@@ -46,7 +46,7 @@ draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 
 | 页面 | 主要元素 | 入口 | 跳转目标 | 建议归属 | 登录 | 缓存/交易备注 | 待确认 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 首页 | logo、搜索、消息、banner、分类入口、限时秒杀、推广带货、推荐商品、底部 Tab | App 启动后主入口 | 搜索、消息、分类、秒杀、推广、商品详情 | Hybrid：Tab 原生，内容 H5 | 是 | 公共内容可缓存；推荐商品价格需实时校验；接口统一带 token | 已接 H5 BFF `/api/bff/home`，首页核心调 Java `/p/app/home/index` |
+| 首页 | logo、搜索、消息、banner、分类入口、限时秒杀、推广带货、推荐商品、底部 Tab | App 启动后主入口 | 搜索、消息、分类、秒杀、推广、商品详情 | Hybrid：Tab 原生，内容 H5 | 是 | 公共内容可缓存；推荐商品价格需实时校验；接口统一带 token | 已接 H5 BFF `/api/bff/home`，首页核心调 Java `/p/app/home/index`；限时秒杀/推广带货入口为 H5 固定 UI，不靠首页配置 |
 | 相似推荐商品 | 常规导航、搜索栏、筛选条件、推荐商品列表 | 首页“为您推荐”右侧“更多” | 商品详情、搜索/筛选结果 | H5 | 是 | 商品基础信息可短缓存；价格、优惠、佣金和可购买状态需实时或短 TTL；接口统一带 token | 已实现 `/home/recommend-products`，使用 `/api/bff/home/for-you-products` -> Java `/p/app/home/forYouProds` |
 | 首页-无 banner | 搜索、分类、秒杀、推广、推荐商品瀑布流 | 首页配置无 banner 时 | 同首页 | H5 | 是 | 同首页 | 只是首页状态，不单独做页面 |
 | 首页-滑动状态 | banner 上滑、搜索栏吸顶或内容滚动状态 | 首页滚动 | 同首页 | H5 | 同首页 | 同首页 | 需要特殊吸顶交互 |
@@ -62,12 +62,12 @@ draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 
 | 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
 | --- | --- | --- | --- | --- | --- |
-| `/` | 首页 | 已接真实 BFF + fallback | Java `/p/app/home/index`，推荐分页接口 | Tab 根 WebView | 推荐商品可下滑加载更多 |
-| `/home/recommend-products` | 相似推荐商品 | 已接真实 BFF + fallback | Java `/p/app/home/forYouProds` | 新 H5 WebView | 从首页“更多”进入 |
+| `/` | 首页 | 已接真实 BFF | Java `/p/app/home/index` 的 `banners/navList`，推荐分页接口；限时秒杀/推广带货入口为 H5 固定 UI | Tab 根 WebView | 推荐商品可下滑加载更多；首页类目直接展示 `navList`；banner/类目为空展示骨架屏；接口失败或业务模块缺失时不回退本地 mock；固定入口分别跳 `/seckill` 和 `/promotion/products` |
+| `/home/recommend-products` | 相似推荐商品 | 已接真实 BFF | Java `/p/app/home/forYouProds` | 新 H5 WebView | 从首页“更多”进入；接口失败或空列表不拼接本地 mock |
 | `/mine` | 我的 | 已高保真 | 本地 mock | Tab 根 WebView | V1-V5 达人等级图片徽章已接入 |
-| `/category` | 分类 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 真实分类接口待接 |
-| `/search` | 搜索 | 静态高保真 / mock | 本地 mock | 当前或新 H5 WebView | 搜索真实接口待接 |
-| `/search/ranking` | 搜索热榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 热榜接口待接 |
+| `/category` | 分类 | 已接真实 BFF | BFF `/api/bff/category/list` -> Java `/category/list?parentId=-1&shopId=0&depth=3` | 新 H5 WebView | 首屏骨架，空数组展示空态，不拼接 mock；leaf 进入 `/search?categoryId=<id>` |
+| `/search` | 搜索 | 热门词、热榜和搜索结果商品已接真实 BFF；搜索历史本地存储 | BFF `/api/bff/search/hot-keywords` -> Java `/search/hotSearch`；BFF `/api/bff/search/ranking?categoryBoardCount=4` -> Java `/search/rankTabs?categoryBoardCount=4`、`/search/rank/{rankType}`；BFF `/api/bff/search/products` -> Java `/p/app/prod/page`；localStorage `meumall.search.history` | 当前或新 H5 WebView；离开搜索页用 replace | `q` 搜索全局商品，`categoryId` 分类入口限定当前类目；无分类入口时分类查询传 `parentId=0`；排序只保留销量/价格双向互斥；分类筛选递归展示接口 `children/categories` 子孙树；分类面板有蒙层和滚动锁定，确认/重置后才应用分类请求；结果页内再次搜索/清空关键词不重置排序和分类状态；搜索框只保留 H5 自定义清空按钮；商品结果滚动到底部自动加载下一页；商品空数据使用通用空态；热榜空态不使用白底卡片；进入商品详情或完整榜单时替换当前搜索 history，完整榜单携带当前热榜标签 `rankType/categoryId`，App 返回/滑动返回回到搜索页之前的首页 |
+| `/search/ranking` | 搜索热榜 | 已接真实 BFF | BFF `/api/bff/search/ranking` -> Java `/search/rankTabs`、`/search/rank/{rankType}` | 新 H5 WebView；从搜索页进入时 replace | 完整榜单不传 `categoryBoardCount`，商品列表按接口返回完整展示；从搜索页进入不保留 `/search` history；支持通过 URL `rankType/categoryId` 打开指定标签；页内切换标签只更新 state 和 BFF 请求，不操作路由；支持商品主图和空/错态；不拼接本地 mock |
 | `/messages` | 消息中心 | 静态占位 | 本地 mock | 新 H5 WebView | 消息真实接口待接 |
 | `/consult` | 咨询入口 | 静态占位 | 本地 mock | 新 H5 WebView | 是否接 IM / 客服待确认 |
 | `/seckill` | 限时秒杀 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 秒杀真实接口后置 |
@@ -76,8 +76,11 @@ draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 
 | 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
 | --- | --- | --- | --- | --- | --- |
-| `/product/[id]` | 商品详情 | 普通商品真实链路已接入 | BFF `/api/bff/product-detail` -> Java `/prod/prodInfo`，辅助聚合评论/店铺接口 | 新 H5 WebView | 支持普通商品、快递、SKU、立即购买、富文本、视频/图片轮播 |
-| `/order-confirm` | 订单确认 | 真实商品参数实时校验已接入 | BFF `/api/bff/order-confirm` 重新校验商品/SKU/库存/价格 | 当前 WebView push | 正式下单和支付未接 |
+| `/product/[id]` | 商品详情 | 普通商品真实链路已接入 | Bridge `address.getDefault` -> BFF `/api/bff/product-detail` -> Java `/prod/prodInfo`，辅助聚合评论/店铺接口 | 新 H5 WebView | 支持普通商品、快递、SKU、立即购买、富文本、视频/图片轮播；配送行展示默认地址 |
+| `/order-confirm` | 订单确认 | 真实商品参数实时校验和普通快递订单创建已接入 | URL 地址优先；无地址时 Bridge `address.getDefault`；BFF `/api/bff/order-confirm` 校验地址/商品/SKU/库存/价格并调用 Java `/p/order/confirm` 生成确认上下文；`/api/bff/order-submit` 创建待支付订单 | 当前 WebView push | 无收货地址时禁止提交；普通快递链路不以 Java 确认 `submitOrder=0` 置灰；提交成功后跳 `/pay-way` |
+| `/pay-way` | 收银台 | 订单支付信息展示已接入；实际确认付款后置 | BFF `/api/bff/order-pay-info` -> Java `/p/order/getOrderPayInfoByOrderNumber`、`/sys/config/info/getSysPaySwitch` | 当前 WebView push | 只展示订单金额、倒计时、支付方式；点击“确定支付”仅本地提示“已发起支付”，暂不调用 Java `/p/order/pay`、不接支付 Bridge、不跳支付结果页 |
+| `/address` | 收货地址列表 | 已接 Bridge + 真实 BFF | Bridge `address.getList/address.setDefault/address.delete`；BFF `/api/bff/address/*` -> Java `/p/address/*` | 新 H5 WebView；订单确认选择地址时当前 WebView push | 支持管理态和 `select=1` 选择态；接口无数据时展示空态，不展示本地样例地址 |
+| `/address/edit` | 新增/编辑收货地址 | 已接 Bridge + 真实 BFF | Bridge `address.getInfo/address.save/address.chooseLocation`；BFF `/api/bff/address/info`、`/api/bff/address/save`、`/api/bff/address/regions` -> Java `addrInfo/addAddr/updateAddr/listByPid` | 当前 WebView push | 新增/编辑保存已接；省市区只用 Java `/p/area/listByPid`，接口无数据不展示本地选项；定位 Bridge 已预留，App 后续接真实定位 |
 | `/wallet` | 钱包 | 静态高保真 | 本地 mock | 新 H5 WebView | 结算 tab 为页面内 state，不改 URL |
 | `/favorites/products` | 我的收藏-商品 | 静态高保真 | 本地 mock | 新 H5 WebView | 支持编辑态，全选/删除为本地交互 |
 | `/favorites/shops` | 我的收藏-店铺 | 静态占位 / 低保真 | 本地 mock | 新 H5 WebView | 店铺收藏高保真和接口待补 |
@@ -112,8 +115,22 @@ draft，已按 2026-06-12 当前 H5 实际路由和实现状态补充。
 | `/api/bff/home` | 首页核心数据 | 已实现 | Java `/p/app/home/index` | 依赖 `mallToken` |
 | `/api/bff/home/recommend-products` | 首页推荐商品分页 | 已实现 | Java `/p/app/home/recommendProds` | 首页底部加载更多 |
 | `/api/bff/home/for-you-products` | 相似推荐商品分页 | 已实现 | Java `/p/app/home/forYouProds` | `/home/recommend-products` 使用 |
+| `/api/bff/search/hot-keywords` | 搜索热门词 | 已实现 | Java `/search/hotSearch?type=1` | `/search` 热门搜索使用，空数据不拼接 mock |
+| `/api/bff/search/ranking` | 搜索热榜标签和商品 | 已实现 | Java `/search/rankTabs`、`/search/rank/{rankType}` | `/search` 传 `categoryBoardCount=4` 且商品截前三条；`/search/ranking` 不传该参数并展示完整商品；完整榜单可按 `rankType/categoryId` 初始化标签；标签/商品空数据展示空态，不拼接 mock |
+| `/api/bff/search/products` | 搜索结果商品 | 已实现 | Java `/p/app/prod/page`、`/category/list?parentId=<id>&shopId=0` | 支持 `keyword/orderBy/categoryId/categoryOptionsParentId`；首页分类入口带 `categoryId` 时按当前类目 scope 查询，分类筛选通过 `/category/list` 且默认不传 `depth` 获取所有子孙类目；BFF 递归保留 `children/categories` 树；无 `categoryId` 时全局搜索且分类查询传 `parentId=0`；结果页底部进入视口自动加载下一页；接口失败不回退本地 mock |
+| `/api/bff/category/list` | 商品分类列表 | 已实现 | Java `/category/list?parentId=-1&shopId=0&depth=3` | `/category` 使用，空数据不拼接 mock |
 | `/api/bff/product-detail` | 商品详情聚合 | 已实现 | Java `/prod/prodInfo`、评论/店铺辅助接口 | 只读聚合，辅助接口失败不拖垮主数据 |
-| `/api/bff/order-confirm` | 订单确认实时校验 | 已实现 | 商品详情 BFF / Java 商品详情 | 不执行正式下单 |
+| `/api/bff/order-confirm` | 订单确认实时校验 | 已实现 | Java `/p/address/addrInfo/{addrId}`、`/prod/prodInfo`、`/p/order/confirm` | 不创建订单；先解析收货地址，再确认 SKU、库存、价格，并按旧 uni-app 普通商品快递 DTO 生成后端确认上下文 |
+| `/api/bff/order-submit` | 普通快递订单提交 | 已实现 | Java `/p/address/addrInfo/{addrId}`、`/prod/prodInfo`、`/p/order/confirm`、`/p/order/submit` | 无收货地址返回 409；提交前再次确认并复用确认返回的 `shopCartOrders` 生成店铺提交参数；创建待支付订单并进入 `/pay-way` |
+| `/api/bff/order-pay-info` | 收银台订单支付信息 | 已实现 | Java `/p/order/getOrderPayInfoByOrderNumber`、`/sys/config/info/getSysPaySwitch` | 只读订单金额、过期时间、订单支付状态和可用支付方式；本期不调用 `/p/order/pay` |
+| `/api/bff/address/list` | 收货地址列表 | 已实现 | Java `/p/address/list` | 地址页进入后同步真实地址；失败或空数据时展示空态，不拼接本地样例地址 |
+| `/api/bff/address/info` | 收货地址详情 | 已实现 | Java `/p/address/addrInfo/{addrId}` | 编辑页回填 |
+| `/api/bff/address/save` | 新增/编辑收货地址 | 已实现 | Java `/p/address/addAddr`、`/p/address/updateAddr` | 保存后回到地址列表 |
+| `/api/bff/address/default` | 设置默认地址 | 已实现 | Java `/p/address/defaultAddr/{addrId}` | 地址列表操作 |
+| `/api/bff/address/delete` | 删除收货地址 | 已实现 | Java `/p/address/deleteAddr/{addrId}` | 地址列表操作 |
+| `/api/bff/address/regions` | 省市区级联 | 已实现 | Java `/p/area/listByPid` | 无 `parentId` 获取省份；带 `parentId` 获取市/区；空数据不拼接本地兜底 |
+
+地址 Bridge：H5 已支持 `rpc/address.getDefault`、`address.getList`、`address.getInfo`、`address.save`、`address.setDefault`、`address.delete`，并预留 `address.chooseLocation`；App 支持时优先使用 Bridge，以上 BFF 为 fallback 和交易校验依赖，定位当前不走 BFF fallback。
 
 ## 商品与活动
 
