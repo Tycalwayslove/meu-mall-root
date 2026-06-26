@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+H5_SOURCE_DIR="${H5_SOURCE_DIR:-${ROOT_DIR}/hybird-meumall}"
 
 REMOTE_HOST="${REMOTE_HOST:-8.163.107.208}"
 REMOTE_USER="${REMOTE_USER:-root}"
@@ -10,109 +11,8 @@ REMOTE_PATH="${REMOTE_PATH:-/opt/mail4j/meu-mall}"
 DOMAIN="${DOMAIN:-hybird.aigcpop.com}"
 SERVER_URL="${SERVER_URL:-https://${DOMAIN}}"
 DRY_RUN="${DRY_RUN:-false}"
-
-read_package_version() {
-  node -e '
-const packageJson = require(process.argv[1]);
-if (!packageJson.version) process.exit(2);
-process.stdout.write(packageJson.version);
-' "${ROOT_DIR}/hybird-meumall/package.json"
-}
-
-resolve_git_commit() {
-  local git_ref="$1"
-  git -C "${ROOT_DIR}/hybird-meumall" rev-parse "${git_ref}^{commit}" 2>/dev/null
-}
-
-active_manifest_stable_version() {
-  local manifest_url="${SERVER_URL%/}/api/h5/manifest/active?environment=prod"
-  python3 - "${manifest_url}" <<'PY'
-import json
-import sys
-import urllib.request
-
-url = sys.argv[1]
-with urllib.request.urlopen(url, timeout=20) as response:
-    payload = json.loads(response.read().decode("utf-8"))
-
-manifest = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
-stable_version = manifest.get("stableVersion") if isinstance(manifest, dict) else None
-if stable_version:
-    print(stable_version)
-PY
-}
-
-PACKAGE_VERSION="$(read_package_version || true)"
-if [ -z "${PACKAGE_VERSION}" ]; then
-  echo "hybird-meumall/package.json 必须声明 version，发布版本由该字段生成。" >&2
-  exit 2
-fi
-if [[ ! "${PACKAGE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-  echo "package.json version 必须是 npm 语义化版本，例如 1.0.1。当前值：${PACKAGE_VERSION}" >&2
-  exit 2
-fi
-
-H5_VERSION="v${PACKAGE_VERSION}"
-REQUIRED_GIT_TAG="h5/${H5_VERSION}"
-GIT_REF="${GIT_REF:-${REQUIRED_GIT_TAG}}"
-GIT_COMMIT_SHA="$(resolve_git_commit "${GIT_REF}" || true)"
-if [ -z "${GIT_COMMIT_SHA}" ]; then
-  if [ "${DRY_RUN}" = "true" ]; then
-    GIT_REF="HEAD"
-    GIT_COMMIT_SHA="$(resolve_git_commit "${GIT_REF}")"
-  else
-    echo "找不到 Git ref：${GIT_REF}。请先在 hybird-meumall 创建并推送 tag：${REQUIRED_GIT_TAG}" >&2
-    exit 2
-  fi
-fi
-
-CURRENT_HEAD_SHA="$(git -C "${ROOT_DIR}/hybird-meumall" rev-parse HEAD)"
-if [ "${CURRENT_HEAD_SHA}" != "${GIT_COMMIT_SHA}" ]; then
-  echo "当前 hybird-meumall HEAD 与 GIT_REF 不一致，不能发布。" >&2
-  echo "HEAD:    ${CURRENT_HEAD_SHA}" >&2
-  echo "GIT_REF: ${GIT_REF} -> ${GIT_COMMIT_SHA}" >&2
-  exit 2
-fi
-
-GIT_TREE_STATE="clean"
-if [ -n "$(git -C "${ROOT_DIR}/hybird-meumall" status --porcelain)" ]; then
-  GIT_TREE_STATE="dirty"
-  if [ "${DRY_RUN}" != "true" ]; then
-    echo "hybird-meumall 存在未提交改动，不能发布。请先提交并创建 ${REQUIRED_GIT_TAG}。" >&2
-    exit 2
-  fi
-fi
-
-GIT_TAG=""
-if git -C "${ROOT_DIR}/hybird-meumall" tag --points-at "${GIT_COMMIT_SHA}" | grep -qx "${REQUIRED_GIT_TAG}"; then
-  GIT_TAG="${REQUIRED_GIT_TAG}"
-elif [ "${DRY_RUN}" != "true" ]; then
-  echo "提交 ${GIT_COMMIT_SHA} 缺少版本 tag：${REQUIRED_GIT_TAG}，不能发布。" >&2
-  exit 2
-fi
-
-GIT_COMMIT_SHORT="$(git -C "${ROOT_DIR}/hybird-meumall" rev-parse --short "${GIT_COMMIT_SHA}")"
-GIT_BRANCH="$(git -C "${ROOT_DIR}/hybird-meumall" rev-parse --abbrev-ref HEAD)"
-GIT_COMMIT_SUBJECT="$(git -C "${ROOT_DIR}/hybird-meumall" log -1 --pretty=%s "${GIT_COMMIT_SHA}")"
-ROLLBACK_VERSION="$(active_manifest_stable_version || true)"
-if [ -z "${ROLLBACK_VERSION}" ]; then
-  echo "无法从 active manifest 读取 rollbackVersion 来源：${SERVER_URL%/}/api/h5/manifest/active?environment=prod" >&2
-  exit 2
-fi
-
-H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-${H5_VERSION}}"
-H5_RELEASE_VARIANT="green"
-H5_BASE_PATH="/h5-v/${H5_VERSION}"
-H5_IMAGE="meu-mall/h5:${H5_VERSION}"
-H5_CONTAINER=""
-H5_HOST_PORT="${H5_HOST_PORT:-}"
-H5_ASSET_PREFIX="${H5_ASSET_PREFIX:-}"
-NEXT_PUBLIC_H5_ASSET_BASE_URL="${NEXT_PUBLIC_H5_ASSET_BASE_URL:-}"
-if [ -z "${H5_ASSET_PREFIX}" ] && [ -n "${NEXT_PUBLIC_H5_ASSET_BASE_URL}" ]; then
-  H5_ASSET_PREFIX="${NEXT_PUBLIC_H5_ASSET_BASE_URL}"
-fi
-
-H5_RUNTIME_ENV_FILE="${H5_RUNTIME_ENV_FILE:-${ROOT_DIR}/hybird-meumall/config/env/h5.prod.env}"
+H5_RELEASE_ENV="${H5_RELEASE_ENV:-prod}"
+H5_RUNTIME_ENV_FILE="${H5_RUNTIME_ENV_FILE:-${H5_SOURCE_DIR}/config/env/h5.${H5_RELEASE_ENV}.env}"
 
 read_h5_env_value() {
   local key="$1"
@@ -128,6 +28,147 @@ read_h5_env_value() {
     eval 'printf "%s" "${'"${key}"':-}"'
   )
 }
+
+JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-$(read_h5_env_value JAVA_API_BASE_URL)}"
+H5_RELEASE_SERVER_URL="${H5_RELEASE_SERVER_URL:-$(read_h5_env_value H5_RELEASE_SERVER_URL)}"
+JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_API_BASE_URL:-}}}"
+JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL}}}}"
+JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN:-${JAVA_RELEASE_TOKEN:-}}"
+JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN:-${JAVA_RELEASE_REGISTER_TOKEN:-${JAVA_H5_RELEASE_TOKEN}}}"
+if [ -z "${JAVA_H5_RELEASE_API_BASE_URL}" ]; then
+  echo "JAVA_H5_RELEASE_API_BASE_URL 不能为空；请配置 H5 版本管理 active manifest 前缀。" >&2
+  exit 2
+fi
+if [ "${REGISTER_RELEASE:-true}" = "true" ] && [ -z "${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}" ]; then
+  echo "JAVA_H5_RELEASE_REGISTER_API_BASE_URL 不能为空；注册 H5 版本记录需要管理系统接口前缀。" >&2
+  exit 2
+fi
+PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}}"
+SERVER_H5_MANIFEST_URL="${SERVER_H5_MANIFEST_URL:-${PUBLIC_H5_MANIFEST_URL}}"
+REQUIRE_EXISTING_TAG="${REQUIRE_EXISTING_TAG:-true}"
+PUSH_TAG_AFTER_RELEASE="${PUSH_TAG_AFTER_RELEASE:-false}"
+CLEAN_OLD_REMOTE_RELEASES="${CLEAN_OLD_REMOTE_RELEASES:-false}"
+REMOTE_KEEP_RELEASES="${REMOTE_KEEP_RELEASES:-1}"
+ALLOW_INITIAL_H5_RELEASE="${ALLOW_INITIAL_H5_RELEASE:-false}"
+
+read_package_version() {
+  node -e '
+const packageJson = require(process.argv[1]);
+if (!packageJson.version) process.exit(2);
+process.stdout.write(packageJson.version);
+' "${H5_SOURCE_DIR}/package.json"
+}
+
+resolve_git_commit() {
+  local git_ref="$1"
+  git -C "${H5_SOURCE_DIR}" rev-parse "${git_ref}^{commit}" 2>/dev/null
+}
+
+active_manifest_stable_version() {
+  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}"
+  JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN}" python3 - "${manifest_url}" <<'PY'
+import json
+import os
+import sys
+import urllib.request
+
+url = sys.argv[1]
+headers = {"Accept": "application/json"}
+token = os.environ.get("JAVA_H5_RELEASE_TOKEN")
+if token:
+    headers["Authorization"] = token
+request = urllib.request.Request(url, headers=headers, method="GET")
+try:
+    with urllib.request.urlopen(request, timeout=20) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+except Exception:
+    sys.exit(0)
+
+manifest = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
+stable_version = manifest.get("stableVersion") if isinstance(manifest, dict) else None
+if stable_version:
+    print(stable_version)
+PY
+}
+
+PACKAGE_VERSION="$(read_package_version || true)"
+if [ -z "${PACKAGE_VERSION}" ] && [ -z "${H5_VERSION:-}" ]; then
+  echo "hybird-meumall/package.json 必须声明 version，发布版本由该字段生成。" >&2
+  exit 2
+fi
+if [ -n "${PACKAGE_VERSION}" ] && [[ ! "${PACKAGE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "package.json version 必须是 npm 语义化版本，例如 1.0.1。当前值：${PACKAGE_VERSION}" >&2
+  exit 2
+fi
+
+H5_VERSION="${H5_VERSION:-v${PACKAGE_VERSION}}"
+if [[ ! "${H5_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "H5_VERSION 必须是 vX.Y.Z 格式，例如 v1.0.15。当前值：${H5_VERSION}" >&2
+  exit 2
+fi
+REQUIRED_GIT_TAG="h5/${H5_VERSION}"
+GIT_REF="${GIT_REF:-${REQUIRED_GIT_TAG}}"
+GIT_COMMIT_SHA="$(resolve_git_commit "${GIT_REF}" || true)"
+if [ -z "${GIT_COMMIT_SHA}" ]; then
+  if [ "${DRY_RUN}" = "true" ]; then
+    GIT_REF="HEAD"
+    GIT_COMMIT_SHA="$(resolve_git_commit "${GIT_REF}")"
+  else
+    echo "找不到 Git ref：${GIT_REF}。请先在 hybird-meumall 创建并推送 tag：${REQUIRED_GIT_TAG}" >&2
+    exit 2
+  fi
+fi
+
+CURRENT_HEAD_SHA="$(git -C "${H5_SOURCE_DIR}" rev-parse HEAD)"
+if [ "${CURRENT_HEAD_SHA}" != "${GIT_COMMIT_SHA}" ]; then
+  echo "当前 hybird-meumall HEAD 与 GIT_REF 不一致，不能发布。" >&2
+  echo "HEAD:    ${CURRENT_HEAD_SHA}" >&2
+  echo "GIT_REF: ${GIT_REF} -> ${GIT_COMMIT_SHA}" >&2
+  exit 2
+fi
+
+GIT_TREE_STATE="clean"
+if [ -n "$(git -C "${H5_SOURCE_DIR}" status --porcelain)" ]; then
+  GIT_TREE_STATE="dirty"
+  if [ "${DRY_RUN}" != "true" ]; then
+    echo "hybird-meumall 存在未提交改动，不能发布。请先提交并创建 ${REQUIRED_GIT_TAG}。" >&2
+    exit 2
+  fi
+fi
+
+GIT_TAG=""
+if git -C "${H5_SOURCE_DIR}" tag --points-at "${GIT_COMMIT_SHA}" | grep -qx "${REQUIRED_GIT_TAG}"; then
+  GIT_TAG="${REQUIRED_GIT_TAG}"
+elif [ "${DRY_RUN}" != "true" ] && [ "${REQUIRE_EXISTING_TAG}" = "true" ]; then
+  echo "提交 ${GIT_COMMIT_SHA} 缺少版本 tag：${REQUIRED_GIT_TAG}，不能发布。" >&2
+  exit 2
+fi
+
+GIT_COMMIT_SHORT="$(git -C "${H5_SOURCE_DIR}" rev-parse --short "${GIT_COMMIT_SHA}")"
+GIT_BRANCH="$(git -C "${H5_SOURCE_DIR}" rev-parse --abbrev-ref HEAD)"
+GIT_COMMIT_SUBJECT="$(git -C "${H5_SOURCE_DIR}" log -1 --pretty=%s "${GIT_COMMIT_SHA}")"
+ROLLBACK_VERSION="$(active_manifest_stable_version || true)"
+if [ -z "${ROLLBACK_VERSION}" ]; then
+  if [ "${ALLOW_INITIAL_H5_RELEASE}" = "true" ]; then
+    ROLLBACK_VERSION="${H5_VERSION}"
+    echo "Java active manifest 暂不可用，按初始版本使用自身作为 rollbackVersion：${ROLLBACK_VERSION}" >&2
+  else
+    echo "无法从 Java active manifest 读取 rollbackVersion 来源：${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}" >&2
+    exit 2
+  fi
+fi
+
+H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-${H5_VERSION}}"
+H5_RELEASE_VARIANT="green"
+H5_BASE_PATH="/h5-v/${H5_VERSION}"
+H5_IMAGE="meu-mall/h5:${H5_VERSION}"
+H5_CONTAINER=""
+H5_HOST_PORT="${H5_HOST_PORT:-}"
+H5_ASSET_PREFIX="${H5_ASSET_PREFIX:-}"
+NEXT_PUBLIC_H5_ASSET_BASE_URL="${NEXT_PUBLIC_H5_ASSET_BASE_URL:-}"
+if [ -z "${H5_ASSET_PREFIX}" ] && [ -n "${NEXT_PUBLIC_H5_ASSET_BASE_URL}" ]; then
+  H5_ASSET_PREFIX="${NEXT_PUBLIC_H5_ASSET_BASE_URL}"
+fi
 
 APP_ENV="${APP_ENV:-$(read_h5_env_value APP_ENV)}"
 NEXT_PUBLIC_APP_ENV="${NEXT_PUBLIC_APP_ENV:-$(read_h5_env_value NEXT_PUBLIC_APP_ENV)}"
@@ -188,9 +229,13 @@ trap cleanup_local EXIT
 print_summary() {
   cat <<SUMMARY
 == Meu Mall H5 version deploy ==
+H5 source:    ${H5_SOURCE_DIR}
 Remote:       ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PORT}
 Path:         ${REMOTE_PATH}
 Domain:       ${DOMAIN}
+Release env:  ${H5_RELEASE_ENV}
+Java manifest:${JAVA_H5_RELEASE_API_BASE_URL}
+Java register:${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}
 Package:      ${PACKAGE_VERSION}
 Version:      ${H5_VERSION}
 Git ref:      ${GIT_REF}
@@ -205,6 +250,8 @@ Register:     ${REGISTER_RELEASE}
 Promote:      ${PROMOTE_RELEASE}
 Feishu review:${SEND_FEISHU_REVIEW}
 Feishu dry:   ${FEISHU_REVIEW_DRY_RUN}
+Push tag:     ${PUSH_TAG_AFTER_RELEASE}
+Remote clean: ${CLEAN_OLD_REMOTE_RELEASES} keep=${REMOTE_KEEP_RELEASES}
 CDN asset:    ${NEXT_PUBLIC_H5_ASSET_BASE_URL:-none}
 H5 env file:  ${H5_RUNTIME_ENV_FILE}
 App env:      ${APP_ENV}
@@ -311,6 +358,36 @@ copy_dir_if_exists() {
   fi
 }
 
+copy_h5_file_if_exists() {
+  local source_path="$1"
+  local target_path="$2"
+
+  if [ -f "${H5_SOURCE_DIR}/${source_path}" ]; then
+    mkdir -p "${SYNC_DIR}/$(dirname "${target_path}")"
+    cp "${H5_SOURCE_DIR}/${source_path}" "${SYNC_DIR}/${target_path}"
+  fi
+}
+
+copy_h5_dir_if_exists() {
+  local source_path="$1"
+  local target_path="$2"
+
+  if [ -d "${H5_SOURCE_DIR}/${source_path}" ]; then
+    mkdir -p "${SYNC_DIR}/$(dirname "${target_path}")"
+    rsync -a --delete \
+      --exclude=node_modules \
+      --exclude=.next \
+      --exclude=dist \
+      --exclude=.venv \
+      --exclude=.pytest_cache \
+      --exclude=__pycache__ \
+      --exclude=.DS_Store \
+      --exclude='*.log' \
+      "${H5_SOURCE_DIR}/${source_path}/" \
+      "${SYNC_DIR}/${target_path}/"
+  fi
+}
+
 prepare_sync_bundle() {
   SYNC_DIR="$(mktemp -d)"
 
@@ -318,17 +395,17 @@ prepare_sync_bundle() {
   copy_dir_if_exists "deploy/docker" "deploy/docker"
   copy_dir_if_exists "deploy/nginx" "deploy/nginx"
 
-  copy_file_if_exists "hybird-meumall/package.json" "hybird-meumall/package.json"
-  copy_file_if_exists "hybird-meumall/pnpm-lock.yaml" "hybird-meumall/pnpm-lock.yaml"
-  copy_file_if_exists "hybird-meumall/next.config.ts" "hybird-meumall/next.config.ts"
-  copy_file_if_exists "hybird-meumall/next-env.d.ts" "hybird-meumall/next-env.d.ts"
-  copy_file_if_exists "hybird-meumall/tsconfig.json" "hybird-meumall/tsconfig.json"
-  copy_file_if_exists "hybird-meumall/tailwind.config.ts" "hybird-meumall/tailwind.config.ts"
-  copy_file_if_exists "hybird-meumall/postcss.config.js" "hybird-meumall/postcss.config.js"
-  copy_file_if_exists "hybird-meumall/eslint.config.mjs" "hybird-meumall/eslint.config.mjs"
-  copy_file_if_exists "hybird-meumall/vitest.config.ts" "hybird-meumall/vitest.config.ts"
-  copy_dir_if_exists "hybird-meumall/public" "hybird-meumall/public"
-  copy_dir_if_exists "hybird-meumall/src" "hybird-meumall/src"
+  copy_h5_file_if_exists "package.json" "hybird-meumall/package.json"
+  copy_h5_file_if_exists "pnpm-lock.yaml" "hybird-meumall/pnpm-lock.yaml"
+  copy_h5_file_if_exists "next.config.ts" "hybird-meumall/next.config.ts"
+  copy_h5_file_if_exists "next-env.d.ts" "hybird-meumall/next-env.d.ts"
+  copy_h5_file_if_exists "tsconfig.json" "hybird-meumall/tsconfig.json"
+  copy_h5_file_if_exists "tailwind.config.ts" "hybird-meumall/tailwind.config.ts"
+  copy_h5_file_if_exists "postcss.config.js" "hybird-meumall/postcss.config.js"
+  copy_h5_file_if_exists "eslint.config.mjs" "hybird-meumall/eslint.config.mjs"
+  copy_h5_file_if_exists "vitest.config.ts" "hybird-meumall/vitest.config.ts"
+  copy_h5_dir_if_exists "public" "hybird-meumall/public"
+  copy_h5_dir_if_exists "src" "hybird-meumall/src"
 }
 
 run_rsync() {
@@ -405,8 +482,8 @@ docker build \
   --build-arg H5_BFF_LOG_BACKEND_RESPONSE='${H5_BFF_LOG_BACKEND_RESPONSE}' \
   --build-arg H5_BFF_BACKEND_RESPONSE_LOG_LIMIT='${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT}' \
   --build-arg NEXT_PUBLIC_CONFIG_API_BASE_URL='/' \
-  --build-arg NEXT_PUBLIC_H5_MANIFEST_URL='/api/h5/manifest/active?environment=prod' \
-  --build-arg H5_MANIFEST_URL='http://127.0.0.1:4100/api/h5/manifest/active?environment=prod' \
+  --build-arg NEXT_PUBLIC_H5_MANIFEST_URL='${PUBLIC_H5_MANIFEST_URL}' \
+  --build-arg H5_MANIFEST_URL='${SERVER_H5_MANIFEST_URL}' \
   -t '${H5_IMAGE}' \
   .
 
@@ -531,7 +608,7 @@ REMOTE
 }
 
 register_release() {
-  local release_dir="${ROOT_DIR}/hybird-meumall/archives/releases/${H5_VERSION}"
+  local release_dir="${H5_SOURCE_DIR}/archives/releases/${H5_VERSION}"
   local payload_path="${release_dir}/release-registration.json"
   local response_path="${release_dir}/release-registration-response.json"
   local promote_path="${release_dir}/release-promote-response.json"
@@ -540,7 +617,7 @@ register_release() {
   mkdir -p "${release_dir}"
   register_args=(
     "--version" "${H5_VERSION}"
-    "--environment" "prod"
+    "--environment" "${H5_RELEASE_ENV}"
     "--service-base-url" "https://${DOMAIN}"
     "--base-path" "${H5_BASE_PATH}"
     "--rollback-version" "${ROLLBACK_VERSION}"
@@ -552,7 +629,6 @@ register_release() {
     "--commit-subject" "${GIT_COMMIT_SUBJECT}"
     "--docker-image" "${H5_IMAGE}"
     "--container" "${H5_CONTAINER}"
-    "--server-url" "${SERVER_URL}"
     "--output" "archives/releases/${H5_VERSION}/release-registration.json"
   )
   if [ -n "${BUILD_NUMBER:-}" ]; then
@@ -560,20 +636,23 @@ register_release() {
   fi
   if [ -n "${GIT_TAG}" ]; then
     register_args+=("--git-tag" "${GIT_TAG}")
+  elif [ "${PUSH_TAG_AFTER_RELEASE}" = "true" ]; then
+    register_args+=("--git-tag" "${REQUIRED_GIT_TAG}")
   fi
   if [ -n "${NEXT_PUBLIC_H5_ASSET_BASE_URL}" ]; then
     register_args+=("--public-asset-base-url" "${NEXT_PUBLIC_H5_ASSET_BASE_URL}")
   fi
 
   (
-    cd "${ROOT_DIR}/hybird-meumall"
+    cd "${H5_SOURCE_DIR}"
     pnpm run ai:register-release "${register_args[@]}"
   )
 
   RELEASE_PAYLOAD_PATH="${payload_path}" \
   RELEASE_RESPONSE_PATH="${response_path}" \
   RELEASE_PROMOTE_PATH="${promote_path}" \
-  RELEASE_ENDPOINT="${SERVER_URL%/}/api/releases" \
+  RELEASE_ENDPOINT="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL%/}/platform/h5Release" \
+  JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN}" \
   PROMOTE_RELEASE="${PROMOTE_RELEASE}" \
   python3 <<'PY'
 import json
@@ -585,22 +664,33 @@ response_path = os.environ["RELEASE_RESPONSE_PATH"]
 promote_path = os.environ["RELEASE_PROMOTE_PATH"]
 endpoint = os.environ["RELEASE_ENDPOINT"]
 promote = os.environ.get("PROMOTE_RELEASE") == "true"
+token = os.environ.get("JAVA_H5_RELEASE_REGISTER_TOKEN")
 
 with open(payload_path, "rb") as handle:
     payload = handle.read()
 
+headers = {"Content-Type": "application/json", "Accept": "application/json"}
+if token:
+    headers["Authorization"] = token
 request = urllib.request.Request(
     endpoint,
     data=payload,
-    headers={"Content-Type": "application/json", "Accept": "application/json"},
+    headers=headers,
     method="POST",
 )
 with urllib.request.urlopen(request, timeout=20) as response:
-    created = json.loads(response.read().decode("utf-8"))
+    body = json.loads(response.read().decode("utf-8"))
 
 with open(response_path, "w", encoding="utf-8") as handle:
-    json.dump(created, handle, ensure_ascii=False, indent=2)
+    json.dump(body, handle, ensure_ascii=False, indent=2)
     handle.write("\n")
+
+if isinstance(body, dict) and body.get("success") is False:
+    raise RuntimeError(f"release register failed: {body.get('msg') or body}")
+
+created = body.get("data") if isinstance(body, dict) and isinstance(body.get("data"), dict) else body
+if not isinstance(created, dict) or not created.get("id"):
+    raise RuntimeError(f"release register returned invalid payload: {body}")
 
 print(f"registered release: {created.get('id')} {created.get('version')} {created.get('status')}")
 
@@ -609,13 +699,18 @@ if promote:
     promote_request = urllib.request.Request(
         promote_url,
         data=b"",
-        headers={"Accept": "application/json"},
+        headers={k: v for k, v in headers.items() if k != "Content-Type"},
         method="POST",
     )
     with urllib.request.urlopen(promote_request, timeout=20) as response:
-        promoted = json.loads(response.read().decode("utf-8"))
+        promoted_body = json.loads(response.read().decode("utf-8"))
+    if isinstance(promoted_body, dict) and promoted_body.get("success") is False:
+        raise RuntimeError(f"release promote failed: {promoted_body.get('msg') or promoted_body}")
+    promoted = promoted_body.get("data") if isinstance(promoted_body, dict) and isinstance(promoted_body.get("data"), dict) else promoted_body
+    if not isinstance(promoted, dict) or not promoted.get("id"):
+        raise RuntimeError(f"release promote returned invalid payload: {promoted_body}")
     with open(promote_path, "w", encoding="utf-8") as handle:
-        json.dump(promoted, handle, ensure_ascii=False, indent=2)
+        json.dump(promoted_body, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
     print(f"promoted release: {promoted.get('id')} {promoted.get('version')} {promoted.get('status')}")
 PY
@@ -632,6 +727,89 @@ send_feishu_release_review() {
     cd "${ROOT_DIR}"
     pnpm "${review_args[@]}"
   )
+}
+
+push_git_tag_after_release() {
+  local tag_name="${REQUIRED_GIT_TAG}"
+  local remote_url
+
+  if git -C "${H5_SOURCE_DIR}" rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null; then
+    local existing_commit
+    existing_commit="$(git -C "${H5_SOURCE_DIR}" rev-list -n 1 "${tag_name}")"
+    if [ "${existing_commit}" != "${GIT_COMMIT_SHA}" ]; then
+      echo "Tag ${tag_name} 已存在，但指向 ${existing_commit}，不是本次提交 ${GIT_COMMIT_SHA}。" >&2
+      exit 2
+    fi
+  else
+    git -C "${H5_SOURCE_DIR}" tag "${tag_name}" "${GIT_COMMIT_SHA}"
+  fi
+
+  remote_url="$(git -C "${H5_SOURCE_DIR}" config --get remote.origin.url || true)"
+  if [ -z "${remote_url}" ]; then
+    echo "H5 仓库没有 remote.origin.url，无法推送 tag ${tag_name}。" >&2
+    exit 2
+  fi
+
+  if git -C "${H5_SOURCE_DIR}" ls-remote --exit-code --tags origin "refs/tags/${tag_name}" >/dev/null 2>&1; then
+    local remote_commit
+    remote_commit="$(git -C "${H5_SOURCE_DIR}" ls-remote --tags origin "refs/tags/${tag_name}" | awk '{print $1}' | head -1)"
+    if [ "${remote_commit}" != "${GIT_COMMIT_SHA}" ]; then
+      echo "远程 tag ${tag_name} 已存在，但指向 ${remote_commit}，不是本次提交 ${GIT_COMMIT_SHA}。" >&2
+      exit 2
+    fi
+    echo "Tag already exists on origin: ${tag_name}"
+    return
+  fi
+
+  git -C "${H5_SOURCE_DIR}" push origin "${tag_name}"
+}
+
+remote_cleanup_command() {
+  cat <<REMOTE
+set -euo pipefail
+keep='${REMOTE_KEEP_RELEASES}'
+if ! printf '%s' "\${keep}" | grep -Eq '^[0-9]+$' || [ "\${keep}" -lt 1 ]; then
+  keep=1
+fi
+cd '${REMOTE_PATH}'
+
+current_container='${H5_CONTAINER}'
+current_image='${H5_IMAGE}'
+current_version='${H5_VERSION}'
+current_snippet='${SAFE_VERSION}.conf'
+
+docker ps -a --format '{{.Names}}' | grep '^meu-mall-h5-' | while read -r name; do
+  if [ "\${name}" != "\${current_container}" ]; then
+    docker rm -f "\${name}" >/dev/null 2>&1 || true
+  fi
+done
+
+docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '\$1 ~ /^meu-mall\\/h5:/ {print \$1}' | while read -r image; do
+  if [ "\${image}" != "\${current_image}" ]; then
+    docker rmi "\${image}" >/dev/null 2>&1 || true
+  fi
+done
+
+find releases/h5 -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while read -r dir; do
+  if [ "\$(basename "\${dir}")" != "\${current_version}" ]; then
+    rm -rf "\${dir}"
+  fi
+done
+
+for dir in /etc/nginx/conf.d/meu-mall-h5-versions /opt/mail4j/nginx/conf.d/meu-mall-h5-versions; do
+  if [ -d "\${dir}" ]; then
+    find "\${dir}" -maxdepth 1 -type f -name '*.conf' ! -name "\${current_snippet}" -delete
+  fi
+done
+
+if docker ps --format '{{.Names}}' | grep -qx 'mall4j-nginx'; then
+  docker exec mall4j-nginx nginx -t
+  docker exec mall4j-nginx nginx -s reload
+elif command -v nginx >/dev/null 2>&1; then
+  nginx -t
+  nginx -s reload || systemctl reload nginx || service nginx reload
+fi
+REMOTE
 }
 
 print_summary
@@ -661,6 +839,20 @@ if [ "${REGISTER_RELEASE}" = "true" ]; then
   register_release
 else
   echo "== Skip release registration =="
+fi
+
+if [ "${PUSH_TAG_AFTER_RELEASE}" = "true" ]; then
+  echo "== Push H5 git tag =="
+  push_git_tag_after_release
+else
+  echo "== Skip H5 git tag push =="
+fi
+
+if [ "${CLEAN_OLD_REMOTE_RELEASES}" = "true" ]; then
+  echo "== Clean old remote H5 releases =="
+  run_ssh "$(remote_cleanup_command)"
+else
+  echo "== Skip old remote H5 release cleanup =="
 fi
 
 if [ "${SEND_FEISHU_REVIEW}" = "true" ]; then
