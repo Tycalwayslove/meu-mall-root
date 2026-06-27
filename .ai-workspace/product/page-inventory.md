@@ -62,10 +62,10 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 
 | 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
 | --- | --- | --- | --- | --- | --- |
-| `/` | 首页 | 已接真实 BFF | Java `/p/app/home/index` 的 `banners/navList`，推荐分页接口；限时秒杀/推广带货入口为 H5 固定 UI | Tab 根 WebView | 推荐商品可下滑加载更多；首页类目直接展示 `navList`；banner/类目为空展示骨架屏；接口失败或业务模块缺失时不回退本地 mock；固定入口分别跳 `/seckill` 和 `/promotion/products` |
+| `/` | 首页 | 已接真实 BFF | Java `/p/app/home/index` 的 `banners/navList`，推荐分页接口；限时秒杀/推广带货入口为 H5 固定 UI | Tab 根 WebView | 推荐商品可下滑加载更多；首页类目直接展示 `navList`；`navType=1` 跳 `/search/ranking`，若带 `rankType/categoryId` 则打开指定热榜标签；`navType=2` 跳 `/search?categoryId=<id>`；`navType=3` 跳 `/category`；banner/类目为空展示骨架屏；接口失败或业务模块缺失时不回退本地 mock；固定入口分别跳 `/seckill` 和 `/promotion/products` |
 | `/home/recommend-products` | 相似推荐商品 | 已接真实 BFF | Java `/p/app/home/forYouProds` | 新 H5 WebView | 从首页“更多”进入；接口失败或空列表不拼接本地 mock |
-| `/mine` | 我的 | 已高保真 | 本地 mock | Tab 根 WebView | V1-V5 达人等级图片徽章已接入 |
-| `/category` | 分类 | 已接真实 BFF | BFF `/api/bff/category/list` -> Java `/category/list?parentId=-1&shopId=0&depth=3` | 新 H5 WebView | 首屏骨架，空数组展示空态，不拼接 mock；leaf 进入 `/search?categoryId=<id>` |
+| `/mine` | 我的 | 已接真实 BFF | BFF `/api/bff/mine/summary` -> Java `/p/app/profile/summary`、`/p/daren/level/myLevel` | Tab 根 WebView | 钱包余额、今年已省、优惠券和当前达人等级使用真实接口；失败或 token 缺失展示错误态，不回退本地 mock |
+| `/category` | 分类 | 已接真实 BFF | BFF `/api/bff/category/list` -> Java `/category/list?parentId=-1&shopId=0&depth=3` | 新 H5 WebView | 首屏骨架，空数组展示空态，不拼接 mock；leaf 点击与首页 `navType=2` 同口径，进入 `/search?categoryId=<id>` |
 | `/search` | 搜索 | 热门词、热榜和搜索结果商品已接真实 BFF；搜索历史本地存储 | BFF `/api/bff/search/hot-keywords` -> Java `/search/hotSearch`；BFF `/api/bff/search/ranking?categoryBoardCount=4` -> Java `/search/rankTabs?categoryBoardCount=4`、`/search/rank/{rankType}`；BFF `/api/bff/search/products` -> Java `/p/app/prod/page`；localStorage `meumall.search.history` | 当前或新 H5 WebView；离开搜索页用 replace | `q` 搜索全局商品，`categoryId` 分类入口限定当前类目；无分类入口时分类查询传 `parentId=0`；排序只保留销量/价格双向互斥；分类筛选递归展示接口 `children/categories` 子孙树；分类面板有蒙层和滚动锁定，确认/重置后才应用分类请求；结果页内再次搜索/清空关键词不重置排序和分类状态；搜索框只保留 H5 自定义清空按钮；商品结果滚动到底部自动加载下一页；商品空数据使用通用空态；热榜空态不使用白底卡片；进入商品详情或完整榜单时替换当前搜索 history，完整榜单携带当前热榜标签 `rankType/categoryId`，App 返回/滑动返回回到搜索页之前的首页 |
 | `/search/ranking` | 搜索热榜 | 已接真实 BFF | BFF `/api/bff/search/ranking` -> Java `/search/rankTabs`、`/search/rank/{rankType}` | 新 H5 WebView；从搜索页进入时 replace | 完整榜单不传 `categoryBoardCount`，商品列表按接口返回完整展示；从搜索页进入不保留 `/search` history；支持通过 URL `rankType/categoryId` 打开指定标签；页内切换标签只更新 state 和 BFF 请求，不操作路由；支持商品主图和空/错态；不拼接本地 mock |
 | `/messages` | 消息中心 | 静态占位 | 本地 mock | 新 H5 WebView | 消息真实接口待接 |
@@ -93,19 +93,20 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 
 | 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
 | --- | --- | --- | --- | --- | --- |
-| `/promotion` | 推广首页 | 已高保真 / mock | 本地 mock | Tab 根 WebView | V1-V5 达人主题和本地资源已接入 |
+| `/promotion` | 推广首页 | 已接真实 BFF | Java `/p/distribution/home/overview` | Tab 根 WebView | 真实接口返回用户信息、达人等级、我的带货和六宫格；失败或 token 缺失展示错误态，不回退本地 mock；V1-V5 主题本地资源继续承载视觉 |
 | `/promotion/products` | 推广商品 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | “推广”按钮已接 `event/share` |
 | `/promotion/commission` | 佣金收益 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 佣金真实字段待确认 |
 | `/promotion/card` | 我的名片 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 保存图片/分享需 App 能力 |
 | `/promotion/activities` | 活动中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 活动接口待接 |
 | `/promotion/activities/[slug]` | 活动详情 | 静态高保真 / mock | 本地 mock | 当前 WebView push | 从活动中心进入 |
 | `/promotion/activities/reward-records` | 奖励记录 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 复用浅绿顶部背景 |
-| `/promotion/benefits` | 权益中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 支持 V1-V5 切换动画 |
+| `/promotion/benefits` | 权益中心 | 已接真实 BFF | BFF `/api/bff/promotion/benefits` -> Java `/p/daren/level/myLevel`、`/p/daren/level/list` | 新 H5 WebView | 使用真实我的等级和等级列表；支持左右滑、箭头和等级轨道切换；接口失败或等级列表为空展示错误态，不回退本地 mock |
 | `/promotion/level` | 达人等级 | 静态页面 / mock | 本地 mock | 新 H5 WebView | 等级规则接口待确认 |
-| `/promotion/rank-center` | 榜单中心 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 入口页 |
-| `/promotion/ranking` | 达人排行榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | 默认榜单 |
-| `/promotion/ranking/sales` | 达人销量榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | Figma 样式已重做 |
-| `/promotion/ranking/amount` | 达人销售额榜 | 静态高保真 / mock | 本地 mock | 新 H5 WebView | Figma 样式已重做 |
+| `/promotion/rank-center` | 榜单中心 | 静态入口 / 部分真实 | 本地入口配置；销量/销售额进入真实榜单；激励榜和战队榜卡片置灰不可点击 | 新 H5 WebView | 入口页；达人激励榜和战队榜暂未开放真实展示 |
+| `/promotion/ranking` | 达人排行榜 | 静态重定向 | 本地路由 | 新 H5 WebView | 默认回榜单中心 |
+| `/promotion/ranking/sales` | 达人销量榜 | 已接真实 BFF | BFF `/api/bff/promotion/rankings/sales` -> Java `/p/distribution/rank/list?rankType=1` | 新 H5 WebView | 支持日/周/月和 `statPeriod`；我的排名来自 `myRank`；页内切换榜单和周期不改路由；空数据展示空态，不回退 mock |
+| `/promotion/ranking/amount` | 达人销售额榜 | 已接真实 BFF | BFF `/api/bff/promotion/rankings/amount` -> Java `/p/distribution/rank/list?rankType=2` | 新 H5 WebView | 支持日/周/月和 `statPeriod`；我的排名来自 `myRank`；页内切换榜单和周期不改路由；空数据展示空态，不回退 mock |
+| `/promotion/ranking/incentive` | 达人激励榜 | 空态占位 | 本地空态，不请求 `rankType=4` | 新 H5 WebView | 当前阶段暂未开放激励榜展示 |
 
 ### BFF 与运行时接口
 
@@ -129,6 +130,10 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 | `/api/bff/address/default` | 设置默认地址 | 已实现 | Java `/p/address/defaultAddr/{addrId}` | 地址列表操作 |
 | `/api/bff/address/delete` | 删除收货地址 | 已实现 | Java `/p/address/deleteAddr/{addrId}` | 地址列表操作 |
 | `/api/bff/address/regions` | 省市区级联 | 已实现 | Java `/p/area/listByPid` | 无 `parentId` 获取省份；带 `parentId` 获取市/区；空数据不拼接本地兜底 |
+| `/api/bff/mine/summary` | 我的页概览 | 已实现 | Java `/p/app/profile/summary`、`/p/daren/level/myLevel` | `/mine` 使用，展示钱包余额、今年已省、优惠券、当前达人等级和个人中心 banner；失败不回退 mock |
+| `/api/bff/promotion/benefits` | 权益中心等级权益 | 已实现 | Java `/p/daren/level/myLevel`、`/p/daren/level/list` | `/promotion/benefits` 使用，等级列表为空展示错误态；支持按 query `level` 初始化 |
+| `/api/bff/promotion/rankings/sales` | 达人销量榜 | 已实现 | Java `/p/distribution/rank/list?rankType=1` | `/promotion/ranking/sales` 使用；支持 `period=day/week/month` 和 `statPeriod`；失败不回退 mock |
+| `/api/bff/promotion/rankings/amount` | 达人销售额榜 | 已实现 | Java `/p/distribution/rank/list?rankType=2` | `/promotion/ranking/amount` 使用；支持 `period=day/week/month` 和 `statPeriod`；失败不回退 mock |
 
 地址 Bridge：H5 已支持 `rpc/address.getDefault`、`address.getList`、`address.getInfo`、`address.save`、`address.setDefault`、`address.delete`，并预留 `address.chooseLocation`；App 支持时优先使用 Bridge，以上 BFF 为 fallback 和交易校验依赖，定位当前不走 BFF fallback。
 
