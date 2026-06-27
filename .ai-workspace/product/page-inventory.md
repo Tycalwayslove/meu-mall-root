@@ -2,14 +2,14 @@
 
 ## 状态
 
-draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
+draft，已按 2026-06-27 当前 H5 实际路由、实现状态和订单迁移方案补充。
 
 ## 来源
 
 - Figma：`喵呜APP`
 - 文件 key：`bNdmC9k76qgoZtYCdYSemL`
 - 初扫日期：2026-06-01
-- 最近仓库更新：2026-06-25
+- 最近仓库更新：2026-06-27
 - 飞书知识库链接：<https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre>
 
 ## 说明
@@ -30,7 +30,7 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 - 我的页面除设置外，其它二级页面暂定都是 H5；设置入口通过 Native Bridge 发送 `router/navigate route=settings`，由 App 打开原生设置页。
 - H5 原生页跳转不再使用 `route=native_page + params.name`，而是直接用原生页面名作为 `payload.route`。
 - 商品详情当前已接入普通商品 + 快递 + SKU + 立即购买 + 订单确认 + 普通快递订单创建；订单确认页加载阶段也会按旧 uni-app 参数调用 Java `/p/order/confirm` 生成确认上下文；秒杀、拼团、自提、同城和支付后置。
-- 首页首批真实接口已接入 H5 BFF，首页类目直接使用 Java `/p/app/home/index` 的 `navList`，不再拼接 `hotCategory/categoryTop8`；商品详情和订单确认首批真实链路已接入 H5 BFF；商品详情、订单确认和地址管理页的地址来源已升级为 App Bridge `rpc/address.*` 优先，H5 BFF/Java 地址接口兜底和服务端校验；个人中心二级页当前多为静态高保真 mock 页面；地址管理已新增列表和新增/编辑页，并接入旧 Java 地址列表、保存、设默认和删除接口。
+- 首页首批真实接口已接入 H5 BFF，首页类目直接使用 Java `/p/app/home/index` 的 `navList`，不再拼接 `hotCategory/categoryTop8`；商品详情和订单确认首批真实链路已接入 H5 BFF；商品详情、订单确认和地址管理页的地址来源已升级为 App Bridge `rpc/address.*` 优先，H5 BFF/Java 地址接口兜底和服务端校验；地址管理已新增列表和新增/编辑页，并接入旧 Java 地址列表、保存、设默认和删除接口；订单列表、退货退款、普通订单详情、退款详情、我的收藏商品和我的足迹已接入真实 H5 BFF，待 App WebView 真实 `mallToken` 联调验证；个人中心钱包和优惠券仍为静态高保真或 mock。
 - 当前 Figma 先按实验稿推进，后续逐页确认正式页面。
 
 已确认决策详见 `.ai-workspace/product/product-decisions.md`。
@@ -82,11 +82,14 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 | `/address` | 收货地址列表 | 已接 Bridge + 真实 BFF | Bridge `address.getList/address.setDefault/address.delete`；BFF `/api/bff/address/*` -> Java `/p/address/*` | 新 H5 WebView；订单确认选择地址时当前 WebView push | 支持管理态和 `select=1` 选择态；接口无数据时展示空态，不展示本地样例地址 |
 | `/address/edit` | 新增/编辑收货地址 | 已接 Bridge + 真实 BFF | Bridge `address.getInfo/address.save/address.chooseLocation`；BFF `/api/bff/address/info`、`/api/bff/address/save`、`/api/bff/address/regions` -> Java `addrInfo/addAddr/updateAddr/listByPid` | 当前 WebView push | 新增/编辑保存已接；省市区只用 Java `/p/area/listByPid`，接口无数据不展示本地选项；定位 Bridge 已预留，App 后续接真实定位 |
 | `/wallet` | 钱包 | 静态高保真 | 本地 mock | 新 H5 WebView | 结算 tab 为页面内 state，不改 URL |
-| `/favorites/products` | 我的收藏-商品 | 静态高保真 | 本地 mock | 新 H5 WebView | 支持编辑态，全选/删除为本地交互 |
+| `/favorites/products` | 我的收藏-商品 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/favorites/products` -> Java `/p/user/collection/prods`；取消收藏 `/api/bff/favorites/products/cancel` -> `/p/user/collection/addOrCancel` | 新 H5 WebView | 支持编辑态、全选和批量取消收藏；列表空数据展示通用空态，不回退本地 mock |
 | `/favorites/shops` | 我的收藏-店铺 | 静态占位 / 低保真 | 本地 mock | 新 H5 WebView | 店铺收藏高保真和接口待补 |
-| `/footprints` | 我的足迹 | 静态高保真 | 本地 mock | 新 H5 WebView | 复用收藏横向商品卡 |
+| `/footprints` | 我的足迹 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/footprints` -> Java `/p/prodBrowseLog/page`；删除 `/api/bff/footprints/delete` -> `/p/prodBrowseLog` | 新 H5 WebView | 支持编辑态、全选和批量删除足迹；商品卡进入详情；列表空数据展示通用空态，不回退本地 mock |
 | `/coupons` | 我的优惠券 | 静态高保真 | 本地 mock | 新 H5 WebView | 优惠券领取/使用接口待接 |
-| `/orders` | 订单列表 | 静态高保真 | 本地 mock | 新 H5 WebView | 支持状态 tab 和空态；订单真实接口待接 |
+| `/orders` | 订单列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders` -> Java `/p/myOrder/myOrder` | 新 H5 WebView | 支持全部、待付款、待发货、待收货、已完成；搜索映射 `prodName`；接口失败/空数据不回退 mock |
+| `/orders/[orderNumber]` | 普通订单详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/detail` -> Java `/p/myOrder/orderDetail`、`/p/myDelivery/orderInfo/{orderNumber}` | 当前 WebView push | 首期覆盖普通快递订单；自提/虚拟/拼团专属详情后置；支持继续付款、取消、确认收货、删除、联系商家 |
+| `/refunds` | 退货退款列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refunds` -> Java `/p/orderRefund/list` | 新 H5 WebView | 独立售后页面，不作为 `/orders` tab；旧 `/orders?status=refund` 重定向到本页；接口失败/空数据不回退 mock |
+| `/refunds/[refundSn]` | 退款详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refund-detail` -> Java `/p/orderRefund/info` | 当前 WebView push | 从退货退款列表进入；首期只展示退款信息，不做撤销、平台介入、修改退款金额；旧 `/orders/refunds/[refundSn]` 兼容重定向 |
 | 原生 `settings` | 设置页 | App 原生承载 | App | native-page | H5 发送 `router/navigate route=settings` |
 
 ### 推广、达人与活动
@@ -124,6 +127,18 @@ draft，已按 2026-06-25 当前 H5 实际路由和实现状态补充。
 | `/api/bff/order-confirm` | 订单确认实时校验 | 已实现 | Java `/p/address/addrInfo/{addrId}`、`/prod/prodInfo`、`/p/order/confirm` | 不创建订单；先解析收货地址，再确认 SKU、库存、价格，并按旧 uni-app 普通商品快递 DTO 生成后端确认上下文 |
 | `/api/bff/order-submit` | 普通快递订单提交 | 已实现 | Java `/p/address/addrInfo/{addrId}`、`/prod/prodInfo`、`/p/order/confirm`、`/p/order/submit` | 无收货地址返回 409；提交前再次确认并复用确认返回的 `shopCartOrders` 生成店铺提交参数；创建待支付订单并进入 `/pay-way` |
 | `/api/bff/order-pay-info` | 收银台订单支付信息 | 已实现 | Java `/p/order/getOrderPayInfoByOrderNumber`、`/sys/config/info/getSysPaySwitch` | 只读订单金额、过期时间、订单支付状态和可用支付方式；本期不调用 `/p/order/pay` |
+| `/api/bff/orders` | 普通订单列表 | 已实现，待 App token 联调 | Java `/p/myOrder/myOrder` | H5 `status` 映射 Java `0/1/2/3/5`；搜索传 `prodName`；分页传 `current/size` |
+| `/api/bff/orders/refunds` | 退货退款列表 | 已实现，待 App token 联调 | Java `/p/orderRefund/list` | 独立 `/refunds` 页面专用接口；默认传 `startTime/endTime` 为空字符串 |
+| `/api/bff/orders/detail` | 普通订单详情 | 已实现，待 App token 联调 | Java `/p/myOrder/orderDetail`、`/p/myDelivery/orderInfo/{orderNumber}` | 聚合订单、地址、商品、费用和物流摘要 |
+| `/api/bff/orders/cancel` | 取消订单 | 已实现，待 App token 联调 | Java `/p/myOrder/cancel/{orderNumber}` | PUT，参数来自当前订单号 |
+| `/api/bff/orders/receipt` | 确认收货 | 已实现，待 App token 联调 | Java `/p/myOrder/receipt/{orderNumber}` | PUT，参数来自当前订单号 |
+| `/api/bff/orders/delete` | 删除订单 | 已实现，待 App token 联调 | Java `/p/myOrder/{orderNumber}` | DELETE，参数来自当前订单号 |
+| `/api/bff/orders/contact-message` | 联系商家留言 | 已实现，待 App token 联调 | Java `/p/myOrder/submitMessage` | POST `orderNumber/userMobile/messageContent` |
+| `/api/bff/orders/refund-detail` | 退款详情 | 已实现，待 App token 联调 | Java `/p/orderRefund/info` | GET `refundSn` |
+| `/api/bff/favorites/products` | 我的收藏商品列表 | 已实现，待 App token 联调 | Java `/p/user/collection/prods` | 分页传 `current/size`；BFF 从 `records[0].products` 映射商品卡 |
+| `/api/bff/favorites/products/cancel` | 取消商品收藏 | 已实现，待 App token 联调 | Java `/p/user/collection/addOrCancel` | POST `{ prodId }`，BFF 转 Java 原始 `prodId` body |
+| `/api/bff/footprints` | 我的足迹列表 | 已实现，待 App token 联调 | Java `/p/prodBrowseLog/page` | 分页传 `current/size`；保留 `prodBrowseLogId` 供删除 |
+| `/api/bff/footprints/delete` | 批量删除足迹 | 已实现，待 App token 联调 | Java `/p/prodBrowseLog` | DELETE `{ ids }`，BFF 转 Java 足迹 ID 数组 body |
 | `/api/bff/address/list` | 收货地址列表 | 已实现 | Java `/p/address/list` | 地址页进入后同步真实地址；失败或空数据时展示空态，不拼接本地样例地址 |
 | `/api/bff/address/info` | 收货地址详情 | 已实现 | Java `/p/address/addrInfo/{addrId}` | 编辑页回填 |
 | `/api/bff/address/save` | 新增/编辑收货地址 | 已实现 | Java `/p/address/addAddr`、`/p/address/updateAddr` | 保存后回到地址列表 |
