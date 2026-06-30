@@ -20,3 +20,5 @@
 # Generated caches
 .cache/
 .tmp/
+node_modules/
+.ai-workspace/tmp/
