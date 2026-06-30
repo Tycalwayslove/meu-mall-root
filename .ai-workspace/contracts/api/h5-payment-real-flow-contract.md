@@ -95,13 +95,64 @@ H5 BFF 转 Java `/p/order/pay`：
 }
 ```
 
+通联微信小程序收银台响应示例：
+
+```json
+{
+  "view": {
+    "orderNumbers": "O202606300001",
+    "payType": 8,
+    "paySettlementType": 1,
+    "execution": {
+      "type": "native-sdk",
+      "provider": "allinpay",
+      "settlementProvider": "allinpay",
+      "paymentMode": "wechat-mini-program",
+      "bizOrderNo": "TL202606300001",
+      "paymentPayload": {
+        "cusid": "990581007426001",
+        "appid": "002",
+        "trxamt": "12990",
+        "reqsn": "O202606300001"
+      },
+      "miniProgram": {
+        "type": "wechat",
+        "appId": "wxef277996acc166c3",
+        "originalId": "gh_e64a1a89a0ad",
+        "path": "pages/orderDetail/orderDetail?cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
+        "queryString": "cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
+        "query": {
+          "cusid": "990581007426001",
+          "appid": "002",
+          "trxamt": "12990",
+          "reqsn": "O202606300001"
+        }
+      }
+    }
+  },
+  "modules": {
+    "orderPay": {
+      "bizOrderNo": "TL202606300001",
+      "miniprogramPayInfo_VSP": "{\"cusid\":\"990581007426001\",\"appid\":\"002\",\"trxamt\":\"12990\",\"reqsn\":\"O202606300001\"}"
+    },
+    "paySettlementType": 1
+  }
+}
+```
+
 `execution.type`：
 
 | 类型 | 说明 | H5 处理 |
 | --- | --- | --- |
-| `native-sdk` | App 支付 SDK 参数。 | 调 `rpc/payment.pay`。 |
+| `native-sdk` | App 支付 SDK 参数；`paymentMode=wechat-mini-program` 时表示通联微信小程序收银台参数。 | 调 `rpc/payment.pay`。 |
 | `open-url` | 通联或支付宝外部 URL。 | 调 `rpc/payment.openUrl`。 |
 | `paid` | 纯积分或无需支付。 | 直接进入成功结果。 |
+
+通联分流规则：
+
+- `paySettlementType=1 + payType=7`：H5 BFF 从 `/p/order/pay` 读取 `miniprogramPayInfo_VSP`，再调 Java `/p/allinpay/order/getAliAppPayUrl` 换取支付宝 URL，返回 `execution.type="open-url"`。
+- `paySettlementType=1 + payType=8`：H5 BFF 从 `/p/order/pay` 读取 `miniprogramPayInfo_VSP/miniprogramPayInfo/miniProgramPayInfo/payInfo/wxPayInfo` 或顶层通联字段，生成 `execution.type="native-sdk"`、`provider="allinpay"`、`paymentMode="wechat-mini-program"`、`miniProgram` 和原始 `paymentPayload`。
+- `miniProgram.path` 固定以 `pages/orderDetail/orderDetail` 为页面路径，query 来自后端通联支付字段，H5 不自行新增签名字段。
 
 ### GET `/api/bff/allinpay-order-status`
 

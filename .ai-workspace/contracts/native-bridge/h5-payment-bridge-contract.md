@@ -13,7 +13,7 @@
 
 ## 背景
 
-H5 运行在 App WebView 中，不能直接使用 uni-app 的 `uni.requestPayment`。H5 负责向 Java 申请支付参数，App 负责调支付宝/微信 SDK 或打开通联外部 URL。
+H5 运行在 App WebView 中，不能直接使用 uni-app 的 `uni.requestPayment`。H5 负责向 Java 申请支付参数，App 负责调支付宝/微信 SDK、打开通联支付宝外部 URL，或按通联微信支付参数拉起微信小程序收银台。
 
 ## Bridge 方法一：`payment.pay`
 
@@ -28,6 +28,7 @@ H5 运行在 App WebView 中，不能直接使用 uni-app 的 `uni.requestPaymen
 ```json
 {
   "provider": "alipay",
+  "paymentMode": "app-sdk",
   "payType": 7,
   "orderNumbers": "O202606290001",
   "sdkPayload": {}
@@ -48,11 +49,59 @@ H5 运行在 App WebView 中，不能直接使用 uni-app 的 `uni.requestPaymen
 
 | 字段 | 类型 | 必填 | 说明 | 兼容规则 |
 | --- | --- | --- | --- | --- |
-| `provider` | `"alipay" \| "wechat"` | 是 | 支付 SDK。 | 新增 provider 需更新契约。 |
+| `provider` | `"alipay" \| "wechat" \| "allinpay"` | 是 | 支付提供方。普通 SDK 为 `alipay/wechat`；通联微信小程序收银台为 `allinpay`。 | 新增 provider 需更新契约。 |
+| `settlementProvider` | `"allinpay"` | 否 | 第三方结算提供方；通联链路传 `allinpay`。 | 可选新增字段，旧 App 可忽略但会无法处理通联微信。 |
+| `paymentMode` | `"app-sdk" \| "wechat-mini-program"` | 否 | 支付执行方式；缺省按 `app-sdk` 兼容。 | 新增模式需更新契约。 |
 | `payType` | number | 是 | Java 支付类型，支付宝 App=7，微信 App=8。 | 兼容旧 Java 枚举。 |
 | `orderNumbers` | string | 是 | 订单号。 | 不可为空。 |
+| `bizOrderNo` | string | 否 | 通联业务订单号。 | 用于 H5 结果页回查。 |
 | `sdkPayload` | unknown | 是 | Java `/p/order/pay` 返回并由 BFF 归一化的 SDK 参数。 | App 只读取所需字段。 |
+| `miniProgram` | object | 否 | `paymentMode=wechat-mini-program` 时必填，包含微信小程序 appId、原始 ID、path 和 query。 | 旧 App 不认识该字段时应返回 `unsupported`。 |
 | `status` | string | 是 | `success/cancelled/failed/unknown`。 | H5 仍需回查订单。 |
+
+### 通联微信小程序收银台
+
+当测试环境 `paySettlementType=1` 且用户选择微信支付 `payType=8` 时，H5 会先调用 Java `/p/order/pay`，再把返回的 `miniprogramPayInfo_VSP` 等通联字段归一化为如下 Bridge payload：
+
+```json
+{
+  "provider": "allinpay",
+  "settlementProvider": "allinpay",
+  "paymentMode": "wechat-mini-program",
+  "payType": 8,
+  "orderNumbers": "O202606300001",
+  "bizOrderNo": "TL202606300001",
+  "sdkPayload": {
+    "cusid": "990581007426001",
+    "appid": "002",
+    "trxamt": "12990",
+    "reqsn": "O202606300001"
+  },
+  "miniProgram": {
+    "type": "wechat",
+    "appId": "wxef277996acc166c3",
+    "originalId": "gh_e64a1a89a0ad",
+    "path": "pages/orderDetail/orderDetail?cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
+    "queryString": "cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
+    "query": {
+      "cusid": "990581007426001",
+      "appid": "002",
+      "trxamt": "12990",
+      "reqsn": "O202606300001"
+    }
+  }
+}
+```
+
+原生实现要求：
+
+- `paymentMode=wechat-mini-program` 时，App 不按普通微信支付 SDK 参数解析 `sdkPayload`，而是使用微信 OpenSDK 打开通联收银台小程序。
+- iOS 建议使用 `WXLaunchMiniProgramReq`，`userName` 取 `miniProgram.originalId`，`path` 取 `miniProgram.path`，`miniProgramType` 按测试/正式环境配置。
+- Android 建议使用 `WXLaunchMiniProgram.Req`，`userName` 取 `miniProgram.originalId`，`path` 取 `miniProgram.path`，`miniprogramType` 按测试/正式环境配置。
+- `miniProgram.path` 已包含 query，App 不需要重新拼接；若 App 出于平台限制要自行拼接，必须保持 `query` / `queryString` 字段值不变。
+- 打开微信小程序成功只表示已发起支付，不表示支付成功。若 App 无法从微信回调确认最终支付结果，应 resolve `{ "status": "unknown", "message": "已打开微信收银台" }`，H5 会进入 `/pay-result` 并回查。
+- 用户取消、微信未安装、SDK 未注册或 payload 缺字段时，App 分别返回 `cancelled`、`failed` 或 `invalid_payload/unsupported`，H5 不伪造成功。
+- 通联微信小程序收银台参考文档：<https://prodoc.allinpay.com/doc/732/>。
 
 ## Bridge 方法二：`payment.openUrl`
 
@@ -124,6 +173,7 @@ if (!bridge.isAvailable()) {
 
 - [ ] 方法名保持稳定。
 - [ ] 校验 `provider/payType/orderNumbers/url`。
+- [ ] `payment.pay` 按 `paymentMode` 分流：`app-sdk` 拉起支付宝/微信 App SDK，`wechat-mini-program` 拉起微信小程序收银台。
 - [ ] 支付 SDK 失败、取消、异常均返回明确状态。
 - [ ] `payment.openUrl` 只允许安全 scheme 和支付 URL。
 - [ ] 最低版本写入 App 发布说明。
