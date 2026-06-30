@@ -30,11 +30,32 @@ read_h5_env_value() {
 }
 
 JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-$(read_h5_env_value JAVA_API_BASE_URL)}"
-H5_RELEASE_SERVER_URL="${H5_RELEASE_SERVER_URL:-$(read_h5_env_value H5_RELEASE_SERVER_URL)}"
-JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_API_BASE_URL:-}}}"
-JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL}}}}"
+JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-}}}"
+JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}"
 JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN:-${JAVA_RELEASE_TOKEN:-}}"
 JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN:-${JAVA_RELEASE_REGISTER_TOKEN:-${JAVA_H5_RELEASE_TOKEN}}}"
+
+assert_java_h5_release_base_url() {
+  local name="$1"
+  local value="$2"
+
+  if [ -z "${value}" ]; then
+    echo "${name} 不能为空；H5 版本管理必须显式配置 Java 管理系统接口前缀。" >&2
+    exit 2
+  fi
+
+  case "${value}" in
+    *"/api/h5/manifest"*|*"/api/releases"*|*"/mini_h5"*)
+      {
+        echo "${name} 指向了旧 Python manifest/release 或 Java 业务接口，不允许用于 H5 版本管理。"
+        echo "${name}: ${value}"
+        echo "请配置 Java 管理系统前缀，例如：https://test.aigcpop.com:18088/apis"
+      } >&2
+      exit 2
+      ;;
+  esac
+}
+
 if [ -z "${JAVA_H5_RELEASE_API_BASE_URL}" ]; then
   echo "JAVA_H5_RELEASE_API_BASE_URL 不能为空；请配置 H5 版本管理 active manifest 前缀。" >&2
   exit 2
@@ -43,7 +64,13 @@ if [ "${REGISTER_RELEASE:-true}" = "true" ] && [ -z "${JAVA_H5_RELEASE_REGISTER_
   echo "JAVA_H5_RELEASE_REGISTER_API_BASE_URL 不能为空；注册 H5 版本记录需要管理系统接口前缀。" >&2
   exit 2
 fi
-PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active}"
+
+assert_java_h5_release_base_url "JAVA_H5_RELEASE_API_BASE_URL" "${JAVA_H5_RELEASE_API_BASE_URL}"
+if [ "${REGISTER_RELEASE:-true}" = "true" ]; then
+  assert_java_h5_release_base_url "JAVA_H5_RELEASE_REGISTER_API_BASE_URL" "${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}"
+fi
+
+PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}}"
 SERVER_H5_MANIFEST_URL="${SERVER_H5_MANIFEST_URL:-${PUBLIC_H5_MANIFEST_URL}}"
 REQUIRE_EXISTING_TAG="${REQUIRE_EXISTING_TAG:-true}"
 PUSH_TAG_AFTER_RELEASE="${PUSH_TAG_AFTER_RELEASE:-false}"
@@ -65,7 +92,7 @@ resolve_git_commit() {
 }
 
 active_manifest_stable_version() {
-  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active"
+  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}"
   JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN}" python3 - "${manifest_url}" <<'PY'
 import json
 import os
@@ -734,7 +761,13 @@ send_feishu_release_review() {
 
   (
     cd "${ROOT_DIR}"
-    H5_RELEASE_NOTICE_H5_DIR="${H5_SOURCE_DIR}" pnpm "${review_args[@]}"
+    H5_RELEASE_NOTICE_H5_DIR="${H5_SOURCE_DIR}" \
+    H5_RELEASE_ENV="${H5_RELEASE_ENV}" \
+    JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL}" \
+    JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}" \
+    JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN}" \
+    JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN}" \
+      pnpm "${review_args[@]}"
   )
 }
 

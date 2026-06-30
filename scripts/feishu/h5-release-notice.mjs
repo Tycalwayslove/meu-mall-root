@@ -337,9 +337,42 @@ MeuMall H5 飞书发版通报
 function loadConfig() {
   const example = readJson(exampleConfigPath, {});
   const local = existsSync(localConfigPath) ? readJson(localConfigPath, {}) : {};
+  const releaseEnvironment =
+    args.environment ||
+    process.env.H5_RELEASE_ENV ||
+    local.releaseEnvironment ||
+    example.releaseEnvironment ||
+    "test";
   return {
     ...example,
     ...local,
+    releaseEnvironment,
+    javaReleaseApiBaseUrl:
+      process.env.JAVA_H5_RELEASE_API_BASE_URL ||
+      local.javaReleaseApiBaseUrl ||
+      example.javaReleaseApiBaseUrl ||
+      "",
+    javaReleaseRegisterApiBaseUrl:
+      process.env.JAVA_H5_RELEASE_REGISTER_API_BASE_URL ||
+      local.javaReleaseRegisterApiBaseUrl ||
+      example.javaReleaseRegisterApiBaseUrl ||
+      process.env.JAVA_H5_RELEASE_API_BASE_URL ||
+      local.javaReleaseApiBaseUrl ||
+      example.javaReleaseApiBaseUrl ||
+      "",
+    javaReleaseToken:
+      process.env.JAVA_H5_RELEASE_TOKEN ||
+      local.javaReleaseToken ||
+      example.javaReleaseToken ||
+      "",
+    javaReleaseRegisterToken:
+      process.env.JAVA_H5_RELEASE_REGISTER_TOKEN ||
+      local.javaReleaseRegisterToken ||
+      example.javaReleaseRegisterToken ||
+      process.env.JAVA_H5_RELEASE_TOKEN ||
+      local.javaReleaseToken ||
+      example.javaReleaseToken ||
+      "",
     approvalKeywords: local.approvalKeywords || example.approvalKeywords || ["同意", "确认", "approve"],
     approvalReadAs: local.approvalReadAs || example.approvalReadAs || local.sendAs || example.sendAs || "bot",
     sendAs: local.sendAs || example.sendAs || "bot",
@@ -376,30 +409,42 @@ async function collectContext(config) {
         .split("\n")
         .filter(Boolean);
 
-  const activeManifest = await fetchJson(config.manifestUrl);
+  const javaReleaseContext = await fetchJavaReleaseContext(config, version);
+  const activeManifest = javaReleaseContext?.activeManifest || await fetchJson(config.manifestUrl);
   const changeSummary = readTextIfExists(path.join(h5Dir, ".ai/CHANGE_SUMMARY.md"));
   const latestChange = extractLatestChange(changeSummary);
   const latestReleaseReport = findLatestReleaseReport(version);
+  const javaTargetRelease = javaReleaseContext?.targetRelease || null;
+  const javaTargetMeta = normalizeBuildMeta(javaTargetRelease);
+  const javaTargetManifest = normalizeJsonObject(javaTargetRelease?.manifest);
+  const javaCommit = javaTargetMeta.gitCommit || javaTargetMeta.git_commit || "";
+  const javaGitTag = javaTargetMeta.gitTag || javaTargetMeta.git_tag || "";
+  const javaCommitSubject = javaTargetMeta.commitSubject || javaTargetMeta.commit_subject || "";
+  const resolvedCommit = javaCommit || commit;
+  const resolvedGitTag = javaGitTag || gitTag;
 
   return {
     packageVersion,
     version,
-    gitTag,
-    commit,
-    commitShort,
-    commitSubject,
-    branch,
+    gitTag: resolvedGitTag,
+    commit: resolvedCommit,
+    commitShort: resolvedCommit.slice(0, 7),
+    commitSubject: javaCommitSubject || commitSubject,
+    branch: javaTargetMeta.gitBranch || javaTargetMeta.git_branch || branch,
     previousTag,
     commitLines,
     releaseRegistration,
-    releaseResponse,
+    releaseResponse: javaTargetRelease || releaseResponse,
     promoteResponse,
     activeManifest,
+    targetReleaseManifest: javaTargetManifest,
+    javaReleaseContext,
     latestChange,
     latestReleaseReport,
     serviceBaseUrl: config.serviceBaseUrl || "https://hybird.aigcpop.com",
     basePath:
       releaseRegistration?.basePath ||
+      javaTargetManifest?.assets?.basePath ||
       activeManifest?.assets?.basePath ||
       `/h5-v/${version}`,
   };
@@ -453,6 +498,117 @@ async function fetchJson(url) {
   } catch {
     return null;
   }
+}
+
+async function fetchJavaReleaseContext(config, version) {
+  const activeBaseUrl = String(config.javaReleaseApiBaseUrl || "").trim();
+  const listBaseUrl = String(config.javaReleaseRegisterApiBaseUrl || activeBaseUrl).trim();
+  if (!activeBaseUrl) return null;
+
+  assertJavaReleaseBaseUrl("javaReleaseApiBaseUrl", activeBaseUrl);
+  assertJavaReleaseBaseUrl("javaReleaseRegisterApiBaseUrl", listBaseUrl);
+
+  const environment = config.releaseEnvironment || "test";
+  const activeUrl = withEnvironment(`${activeBaseUrl.replace(/\/+$/, "")}/platform/h5Release/active`, environment);
+  const listUrl = withEnvironment(`${listBaseUrl.replace(/\/+$/, "")}/platform/h5Release/list`, environment);
+  const activePayload = await fetchJsonWithAuth(activeUrl, config.javaReleaseToken);
+  const activeManifest = unwrapJavaData(activePayload);
+  if (!activeManifest || typeof activeManifest !== "object" || !activeManifest.stableVersion) {
+    throw new Error(`无法从 Java H5 版本管理读取 active manifest：${activeUrl}`);
+  }
+
+  const listPayload = await fetchJsonWithAuth(listUrl, config.javaReleaseRegisterToken);
+  const releaseItems = unwrapJavaData(listPayload);
+  if (releaseItems !== null && !Array.isArray(releaseItems)) {
+    throw new Error(`Java H5 版本列表返回格式异常：${listUrl}`);
+  }
+
+  const activeVersion = activeManifest.stableVersion;
+  const targetRelease = Array.isArray(releaseItems)
+    ? releaseItems.find((item) => item?.version === version) || null
+    : null;
+  const activeRelease = Array.isArray(releaseItems)
+    ? releaseItems.find((item) => item?.version === activeVersion && item?.status === "active") ||
+      releaseItems.find((item) => item?.version === activeVersion) ||
+      null
+    : null;
+
+  return {
+    environment,
+    activeUrl,
+    listUrl,
+    activeManifest,
+    activeRelease,
+    targetRelease,
+    releaseItems: Array.isArray(releaseItems) ? releaseItems : [],
+  };
+}
+
+function assertJavaReleaseBaseUrl(name, value) {
+  if (!value) return;
+  if (/\/api\/h5\/manifest|\/api\/releases|\/mini_h5(?:\/|$)/.test(value)) {
+    throw new Error(
+      `${name} 指向旧 Python manifest/release 或 Java 业务接口，不能用于 H5 版本管理：${value}`,
+    );
+  }
+}
+
+function withEnvironment(url, environment) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}environment=${encodeURIComponent(environment)}`;
+}
+
+async function fetchJsonWithAuth(url, token) {
+  const headers = { Accept: "application/json" };
+  if (token) headers.Authorization = token;
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`请求失败 ${response.status}：${url}`);
+  }
+  return response.json();
+}
+
+function unwrapJavaData(payload) {
+  if (payload === null || payload === undefined) return null;
+  if (typeof payload === "object" && payload.success === false) {
+    throw new Error(`Java H5 版本管理返回失败：${payload.msg || JSON.stringify(payload)}`);
+  }
+  let data = typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "data")
+    ? payload.data
+    : payload;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  return data;
+}
+
+function normalizeBuildMeta(releaseItem) {
+  if (!releaseItem || typeof releaseItem !== "object") return {};
+  let buildMeta = releaseItem.buildMeta || releaseItem.build_meta || {};
+  if (typeof buildMeta === "string") {
+    try {
+      buildMeta = JSON.parse(buildMeta);
+    } catch {
+      buildMeta = {};
+    }
+  }
+  return buildMeta && typeof buildMeta === "object" ? buildMeta : {};
+}
+
+function normalizeJsonObject(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
 function extractLatestChange(markdown) {
@@ -546,6 +702,7 @@ function renderOverviewMessage({ context, config, title, includeApprovalGuide, a
   const activeVersion = context.activeManifest?.stableVersion || "未读取到";
   const rollbackVersion =
     context.releaseRegistration?.rollbackVersion ||
+    context.targetReleaseManifest?.rollbackVersion ||
     context.activeManifest?.rollbackVersion ||
     "未读取到";
   const overview = buildProjectOverview(context, config);
@@ -639,6 +796,7 @@ function renderMessage({ context, config, title, includeApprovalGuide, approvedB
     (activeVersion === context.version ? "active" : "candidate/待确认");
   const rollbackVersion =
     context.releaseRegistration?.rollbackVersion ||
+    context.targetReleaseManifest?.rollbackVersion ||
     context.activeManifest?.rollbackVersion ||
     "未读取到";
   const notice = buildReleaseNotice(context, config);
@@ -788,9 +946,18 @@ function buildReleaseNotice(context, config) {
     ? context.latestChange.changes
     : context.commitLines.map((line) => line.replace(/^[a-f0-9]+\s+/, "")).slice(0, 8);
   const routes = context.releaseRegistration?.routes || context.activeManifest?.routes || [];
-  const hasRoute = (route) => routes.includes(route);
+  const hasRoute = (route) => {
+    if (Array.isArray(routes)) return routes.includes(route);
+    if (routes && typeof routes === "object") return Object.prototype.hasOwnProperty.call(routes, route);
+    return false;
+  };
   const activeVersion = context.activeManifest?.stableVersion || context.version;
   const basePath = context.basePath;
+  const targetStatus = context.releaseResponse?.status || (activeVersion === context.version ? "active" : "candidate");
+  const versionImpact =
+    activeVersion === context.version
+      ? `H5 线上 active 已切到 ${activeVersion}，App 重新读取 Java active manifest 后会拿到 ${basePath} 这一版资源。`
+      : `${context.version} 已注册为 ${targetStatus}，当前 Java active 仍指向 ${activeVersion}；管理系统 promote 后，App 重新读取 Java active manifest 才会拿到 ${basePath} 这一版资源。`;
 
   const changes = override.changes?.length
     ? override.changes
@@ -803,7 +970,7 @@ function buildReleaseNotice(context, config) {
     : knownReleaseNotice.impact?.length
       ? knownReleaseNotice.impact
     : [
-        `H5 线上入口已切到 ${activeVersion}，App 重新读取 active manifest 后会拿到 ${basePath} 这一版资源。`,
+        versionImpact,
         hasRoute("/member")
           ? "旧 `/member` 路由仍在 manifest 中，暂未清理。"
           : "旧 `/member` 路由已从 H5 和 manifest 中移除，后续不要再从 App 或配置里跳这个地址。",
@@ -818,7 +985,7 @@ function buildReleaseNotice(context, config) {
     : [
         "H5 自动化检查已过：test、typecheck、lint、生产构建都通过。",
         `线上 smoke 已过：${basePath}/api/health、首页、推广页、我的页、搜索页都能访问。`,
-        `active manifest 已确认指向 ${activeVersion}，回滚版本是 ${context.releaseRegistration?.rollbackVersion || context.activeManifest?.rollbackVersion || "未读取到"}。`,
+        `active manifest 已确认指向 ${activeVersion}，目标版本回滚版本是 ${context.releaseRegistration?.rollbackVersion || context.targetReleaseManifest?.rollbackVersion || context.activeManifest?.rollbackVersion || "未读取到"}。`,
       ];
 
   return {
@@ -839,7 +1006,7 @@ function buildReleaseNotice(context, config) {
       : knownReleaseNotice.nativeNeeded?.length
         ? knownReleaseNotice.nativeNeeded
       : [
-          "请确认 App 启动和打开 H5 时仍以 `GET /api/h5/manifest/active?environment=prod` 为准，不要写死某个版本 URL。",
+          "请确认 App 启动和打开 H5 时以 Java H5 版本管理 active manifest 为准，不要读旧 Python manifest，也不要写死某个版本 URL。",
           "请确认原生侧已处理 `tab`、`close_webview`、`native_page=settings` 和 `route_changed`，尤其是二级 WebView 返回首页/Tab 根页面时要关闭当前 WebView。",
           "请实机验证：首页打开搜索/消息/分类/商品详情的新 WebView 策略，以及从二级页返回后首页滚动位置是否保留。",
         ],
@@ -848,7 +1015,7 @@ function buildReleaseNotice(context, config) {
       : knownReleaseNotice.backendDone?.length
         ? knownReleaseNotice.backendDone
       : [
-          "本次 H5 发布已接入 release/manifest 服务：`POST /api/releases`、`POST /api/releases/{id}/promote`、`GET /api/h5/manifest/active?environment=prod`。",
+          "本次 H5 发布已接入 Java H5 版本管理：`GET /platform/h5Release/active`、`GET /platform/h5Release/list`、`POST /platform/h5Release`，promote/rollback 也以 Java 管理系统为准。",
           "本次没有新增正式业务 API 依赖；推广、权益、榜单相关页面仍以 H5 BFF mock 和静态配置为主。",
         ],
     backendNeeded: override.backendNeeded?.length
@@ -905,7 +1072,7 @@ function buildKnownReleaseNotice(context) {
         "H5 已上报 `event/route_changed`，用于原生侧同步 WebView 内部路由状态。",
       ],
       nativeNeeded: [
-        "请确认 App 启动和打开 H5 时仍以 `GET /api/h5/manifest/active?environment=prod` 为准，不要写死某个版本 URL。",
+        "请确认 App 启动和打开 H5 时以 Java H5 版本管理 active manifest 为准，不要读旧 Python manifest，也不要写死某个版本 URL。",
         "请确认原生侧已处理 `native_page=settings`，个人中心设置入口需要拉起原生设置页。",
         "请重点实机验证二级 WebView 返回：钱包、订单、收藏、足迹、优惠券、商品详情、订单确认页返回时不要被页面内 tab 状态污染。",
         "请确认 `tab`、`back`、`close_webview`、`webview` 和 `route_changed` 的事件处理仍符合最新 Bridge 文档。",
@@ -913,7 +1080,7 @@ function buildKnownReleaseNotice(context) {
       backendDone: [
         "首页真实接口已通过 H5 BFF 接入并完成联调，首页推荐和推荐商品列表不再只依赖静态 mock。",
         "商品详情真实接口已通过 H5 BFF 接入并完成联调，商品详情、规格、店铺、评价、富文本详情已经进入真实数据口径。",
-        "发版和 manifest 已走真实 release 服务：`v1.0.13` 已注册并 promoted active。",
+        "发版和 manifest 已走版本管理服务：`v1.0.13` 已注册并 promoted active；后续新发版以 Java H5 版本管理为准。",
       ],
       backendNeeded: [
         "当前最需要后端支持的是下单：请优先补齐或修复订单预览/创建订单接口，让商品详情到订单确认后的真实下单链路能闭环。",

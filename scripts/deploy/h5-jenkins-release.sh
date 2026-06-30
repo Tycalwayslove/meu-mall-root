@@ -63,10 +63,31 @@ set -a
 . "${H5_RUNTIME_ENV_FILE}"
 set +a
 
-JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_API_BASE_URL:-}}}"
-JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-}}}"
+JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-}}}"
+JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}"
 JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN:-${JAVA_RELEASE_TOKEN:-}}"
 JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN:-${JAVA_RELEASE_REGISTER_TOKEN:-${JAVA_H5_RELEASE_TOKEN}}}"
+
+assert_java_h5_release_base_url() {
+  local name="$1"
+  local value="$2"
+
+  if [ -z "${value}" ]; then
+    echo "${name} 不能为空；Jenkins H5 发版必须显式配置 Java 管理系统接口前缀。" >&2
+    exit 2
+  fi
+
+  case "${value}" in
+    *"/api/h5/manifest"*|*"/api/releases"*|*"/mini_h5"*)
+      {
+        echo "${name} 指向了旧 Python manifest/release 或 Java 业务接口，不允许用于 H5 版本管理。"
+        echo "${name}: ${value}"
+        echo "请在 ${CONFIG_FILE} 中配置 Java 管理系统前缀，例如：https://test.aigcpop.com:18088/apis"
+      } >&2
+      exit 2
+      ;;
+  esac
+}
 
 missing_config=()
 if [ -z "${JAVA_H5_RELEASE_API_BASE_URL}" ]; then
@@ -86,6 +107,11 @@ if [ "${#missing_config[@]}" -gt 0 ]; then
     echo "Jenkins 页面只保留分支选择，测试环境地址、服务器凭据等固定配置从文件读取。"
   } >&2
   exit 2
+fi
+
+assert_java_h5_release_base_url "JAVA_H5_RELEASE_API_BASE_URL" "${JAVA_H5_RELEASE_API_BASE_URL}"
+if [ "${REGISTER_RELEASE}" = "true" ]; then
+  assert_java_h5_release_base_url "JAVA_H5_RELEASE_REGISTER_API_BASE_URL" "${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}"
 fi
 
 find_h5_tags_for_commit() {

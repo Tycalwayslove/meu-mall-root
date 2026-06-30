@@ -124,7 +124,11 @@ git -C hybird-meumall diff --shortstat <activeCommit>..<targetCommit>
   "senderDisplayName": "company-feishu",
   "reviewMode": "bot_chat",
   "reviewChatId": "oc_xxx",
-  "targetChatId": "oc_xxx"
+  "targetChatId": "oc_xxx",
+  "releaseEnvironment": "test",
+  "javaReleaseApiBaseUrl": "https://test.aigcpop.com:18088/apis",
+  "javaReleaseRegisterApiBaseUrl": "https://test.aigcpop.com:18088/apis",
+  "manifestUrl": ""
 }
 ```
 
@@ -135,6 +139,8 @@ git -C hybird-meumall diff --shortstat <activeCommit>..<targetCommit>
 - `approvalReadAs` 是读取审核群消息的身份，当前推荐 `bot`；如果公司策略不允许 bot 读取群历史消息，可临时改为 `user` 并完成用户授权。
 - `reviewChatId` 是你和 `company-feishu` 机器人所在的审核会话；可以是单独审核群，也可以是包含机器人的固定审核群。
 - `targetChatId` 是正式发版通报要发送到的对接群。
+- `releaseEnvironment`、`javaReleaseApiBaseUrl`、`javaReleaseRegisterApiBaseUrl` 是 Jenkins/Java 发版审核取数来源；必须指向 Java H5 版本管理系统。
+- `manifestUrl` 只保留为历史兜底字段，新发版审核应留空或不配置，禁止指向旧 Python active manifest。
 - `company-feishu` 机器人必须已经加入 `reviewChatId` 和 `targetChatId` 对应会话。
 
 ## 审核读取权限
