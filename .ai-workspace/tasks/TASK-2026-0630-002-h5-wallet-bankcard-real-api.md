@@ -1,0 +1,171 @@
+# TASK-2026-0630-002 H5 钱包与银行卡真实接口联调
+
+## 状态
+
+implemented
+
+## 目标
+
+将 `/wallet` 钱包页从本地 mock 迁移到真实 Java 接口渲染，并新增银行卡管理页，支持查询已绑银行卡和解绑银行卡。
+
+## 背景
+
+个人中心钱包仍是静态高保真页面。用户要求按 Figma 节点 `677:29212` 调整钱包样式，并调用 Apifox 中“分销钱包接口 / 查看分销员钱包数据”和“分销员Api接口 / 分销员推广订单”获取钱包及推广订单数据。银行卡管理按 Figma 节点 `681:30436`、`681:30680`、`681:31290` 接入通联支付会员绑卡查询和解绑接口。本期只完成这些页面和接口，新增绑卡、提现等后续补充。
+
+## 涉及项目
+
+- `hybird-meumall`：页面、BFF、mapper、feature API adapter、样式、测试和项目事实源。
+- Java 业务后端：沿用 Apifox 已有接口，不新增接口。
+
+## 范围
+
+包含：
+
+- `/wallet` 钱包余额、可提现、未结算、结算统计和推广订单列表真实接口渲染。
+- `/wallet/bank-cards` 银行卡管理列表、无卡态和解绑确认弹窗。
+- H5 BFF：
+  - `GET /api/bff/wallet`
+  - `GET /api/bff/wallet/bank-cards`
+  - `POST /api/bff/wallet/bank-cards/unbind`
+- loading、empty、error 和操作中状态。
+- BFF mapper / feature API adapter / 页面渲染测试。
+- 仓库事实源更新。
+- 飞书知识库页面清单和 API/BFF 对接说明同步。
+
+不包含：
+
+- 新增银行卡绑定流程。
+- 提现申请、提现记录详情或账户管理详情。
+- 推广订单详情页。
+
+## 责任边界
+
+`hybird-meumall`：
+
+- 调用 BFF、展示真实接口数据、处理解绑银行卡操作和失败兜底。
+- 联调阶段不使用本地 mock 业务数据兜底。
+
+Java 业务后端：
+
+- 提供 Apifox 中已有钱包、推广订单、通联银行卡查询和解绑接口。
+- 保持鉴权、分页、金额、银行卡字段和错误 envelope 口径稳定。
+
+原生 App：
+
+- 继续向 H5 WebView 注入有效 `mallToken` Cookie。
+
+## 契约影响
+
+- 是否影响跨项目契约：是。
+- 契约文档路径：`.ai-workspace/contracts/api/h5-wallet-bankcard-real-api-contract.md`
+- 是否向后兼容：向后兼容，H5 新增消费方 BFF。
+- 是否需要迁移：需要将 `/wallet` 从 mock 迁移到真实接口渲染。
+- 是否需要灰度：跟随 H5 release 策略。
+
+## 对接说明
+
+- 是否需要对接说明：是。
+- 对接说明路径：`.ai-workspace/integration-briefs/BRIEF-2026-0630-002-h5-wallet-bankcard-real-api.md`
+- 需要确认的角色：后端 / 原生 App。
+- 当前确认状态：Apifox main 分支已确认接口字段；App token 联调待验证。
+
+## 对方责任
+
+后端：
+
+- 保持 `/p/distribution/wallet/info`、`/p/distribution/home/overview`、`/p/distribution/api/queryPromotionOrder`、`/p/allinpay/member/queryBankCardV2`、`/p/allinpay/member/unbindBankCardV2` 可用。
+
+原生 App：
+
+- WebView 打开钱包和银行卡页时注入有效 `mallToken`。
+
+管理后台：
+
+- 无。
+
+CI 或发布：
+
+- 无新增链路；随 H5 SSR 发布。
+
+## Mock 和联调方式
+
+- Mock 数据位置：仅单元测试 fixture。
+- 测试接口环境：`https://test.aigcpop.com/mini_h5`
+- App 测试包版本：沿用当前测试包。
+- 管理后台测试入口：无。
+- 联调步骤：
+  1. App WebView 打开 `/hybird/wallet`。
+  2. 验证 BFF 调钱包接口和推广概览接口，并用 `distributionUserId` 请求推广订单。
+  3. 点击“银行卡管理”进入 `/hybird/wallet/bank-cards`。
+  4. 验证查询银行卡列表。
+  5. 点击解绑银行卡，确认后验证解绑接口 body 包含 `signNum` 与 `acctNum`。
+- H5 fallback：接口失败展示错误/重试；空列表展示空态；不回退 mock。
+
+## 实现计划
+
+1. 建立钱包和银行卡 BFF service、route 与 browser API adapter，并先补测试。
+2. 改造 `/wallet` 页面为真实数据 loading/success/empty/error 渲染，并按 Figma 调整入口和列表样式。
+3. 新增 `/wallet/bank-cards` 页面，接入查卡和解绑流程。
+4. 更新项目状态、页面清单和验证记录。
+
+## 验收标准
+
+- [x] `/wallet` 首屏 loading 后只渲染真实钱包和推广订单数据。
+- [x] 钱包接口失败、推广概览缺失 `distributionUserId` 或推广订单接口失败时展示错误态，不回退 mock。
+- [x] 推广订单空数组时列表展示空态。
+- [x] “银行卡管理”进入 `/wallet/bank-cards`。
+- [x] 银行卡页成功展示真实已绑卡；无卡时展示“添加银行卡”入口空态。
+- [x] 解绑银行卡确认弹窗可取消；确认后调用解绑 BFF，成功后刷新卡列表。
+- [x] BFF 到 Java 的路径、query/body 与 Apifox main 分支一致。
+
+## 验证命令
+
+```bash
+cd hybird-meumall
+pnpm exec vitest run src/features/mine-secondary/wallet-real-service.test.ts src/features/mine-secondary/wallet-api.test.ts src/features/mine-secondary/mine-secondary-pages.test.tsx
+pnpm typecheck
+git diff --check
+```
+
+## 发布影响
+
+- 是否需要发布：是。
+- 发布项目：`hybird-meumall`。
+- 是否需要灰度：跟随 H5 release。
+- 回滚目标：回滚 H5 release 到上一稳定版本。
+- smoke check：`/hybird/wallet`、`/hybird/wallet/bank-cards`。
+
+## 风险和阻塞
+
+- 推广订单接口必填 `userId`，本期从推广概览 `userInfo.distributionUserId` 获取；若后端调整该字段，需要同步契约。
+- 银行卡解绑接口要求 `signNum`，Apifox 查询银行卡响应未显式返回该字段；H5 将优先使用卡片字段或推广概览 `cardNo` 作为会员编号，仍需后端联调确认。
+- 新增银行卡绑定流程不在本期范围，入口暂只展示不可操作提示或占位。
+
+## 变更记录
+
+| 日期 | 状态 | 说明 |
+| --- | --- | --- |
+| 2026-06-30 | ready | 创建钱包与银行卡真实接口联调工作项，Apifox main 分支接口已查询。 |
+| 2026-06-30 | implemented | 已完成 H5 BFF、页面、样式、测试和本地浏览器 smoke；待 App WebView 真实 `mallToken` 联调。 |
+
+## 验证记录
+
+| 日期 | 命令 | 结果 |
+| --- | --- | --- |
+| 2026-06-30 | `pnpm exec vitest run src/features/mine-secondary/wallet-real-service.test.ts src/features/mine-secondary/wallet-api.test.ts src/features/mine-secondary/mine-secondary-pages.test.tsx` | 通过，3 files / 15 tests |
+| 2026-06-30 | `pnpm typecheck` | 通过 |
+| 2026-06-30 | `curl -I http://localhost:3109/hybird/wallet` | 200 OK |
+| 2026-06-30 | `curl -I http://localhost:3109/hybird/wallet/bank-cards` | 200 OK |
+| 2026-06-30 | Playwright + 本机 Chrome 成功态截图 | 钱包、银行卡列表、解绑弹窗可渲染，375 宽度无横向溢出 |
+
+## 飞书知识库同步
+
+| 日期 | 页面 | 链接 | 结果 |
+| --- | --- | --- | --- |
+| 2026-06-30 | 页面清单 | <https://v05ctaei9gn.feishu.cn/docx/IsGAdbLzUoZvZfxzOORcWlKknhc> | 同步成功，revision_id=41 |
+| 2026-06-30 | API/BFF 对接说明 | <https://v05ctaei9gn.feishu.cn/docx/EprCdgJx1odNebxaWescdGRfnve> | 同步成功，revision_id=12 |
+
+## 未验证项
+
+- 尚未在 App WebView 内用真实 `mallToken` 验证 Java 返回数据和解绑银行卡动作。
+- 银行卡解绑 `signNum` 当前取推广概览 `userInfo.cardNo`，仍需后端确认是否为最终口径。
