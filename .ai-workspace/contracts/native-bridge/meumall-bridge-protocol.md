@@ -195,12 +195,13 @@ App 必须提供：
 | 切换一级 tab | `router/navigate` route=`tab` | H5 -> Native | H5 请求原生切 tab。 | H5 路由跳转。 |
 | 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`login`。 | 业务自行决定 H5 fallback。 |
 | 地址管理 | `rpc/address.*` | H5 -> Native | H5 商品详情、订单确认和地址管理页优先通过 App 获取/管理地址。 | 回退 H5 BFF `/api/bff/address/*`。 |
+| App 内支付 | `rpc/payment.pay` | H5 -> Native | H5 收银台请求 App 按后端支付参数拉起支付宝/微信 SDK。 | 不降级到浏览器支付，提示在 App 内完成。 |
+| 打开支付 URL | `rpc/payment.openUrl` | H5 -> Native | H5 收银台请求 App 打开通联等外部支付 URL。 | 浏览器调试可直接跳转 URL，App 内应走 Bridge。 |
 
 ### P2：后续高风险能力
 
 | 能力 | 说明 | 必须单独契约 |
 | --- | --- | --- |
-| 支付 | 涉及订单、金额、支付渠道和结果验签。 | 是 |
 | 保存图片/海报 | 涉及相册权限、失败提示、素材来源。 | 是 |
 | 相机/相册选择 | 涉及权限、文件大小、上传链路。 | 是 |
 | 定位 | 涉及隐私、授权、城市和坐标精度。 | 是 |
@@ -266,6 +267,49 @@ type AddressLocation = {
 - `address.chooseLocation` 是定位能力预留，不回退 BFF；App 未接入时 H5 显示提示，并输出 `[MeuMall][address-location]` console 日志。
 - 订单确认和提交不能只信任 Bridge 返回的地址快照；BFF 仍会调用 Java `/p/address/addrInfo/{addrId}` 校验地址存在性。
 - App debug receiver 仅证明 RPC 通道可用，地址列表/详情返回空，不内置调试收货地址。
+
+## 支付 Bridge 能力
+
+### 背景
+
+旧 uni-app 收银台在点击确认付款后会调用 Java `/p/order/pay` 获取支付参数，再根据测试环境配置 `paySettlementType` 分流到普通支付宝/微信 App SDK 或通联支付。当前 H5 收银台保持同一后端链路，H5 自身不实现 SDK 支付，只负责：
+
+1. 请求 H5 BFF 创建支付参数。
+2. 将支付参数交给 App Bridge。
+3. 根据 App 返回或通联回查结果进入 `/pay-result`。
+
+### Action 表
+
+| action | payload | resolve data | 用途 |
+| --- | --- | --- | --- |
+| `payment.pay` | `{ provider, payType, orderNumbers, sdkPayload }` | `{ status, message? }` | 普通 App 内支付宝/微信 SDK 支付。 |
+| `payment.openUrl` | `{ provider: "allinpay", url, orderNumbers, bizOrderNo? }` | `{ opened, status, message? }` | 通联支付宝 URL 支付或后续其它支付 URL。 |
+
+### Payload 字段
+
+```ts
+type PaymentPayPayload = {
+  provider: "alipay" | "wechat" | "allinpay" | string;
+  payType: 7 | 8 | 0 | number;
+  orderNumbers: string;
+  sdkPayload: unknown;
+  bizOrderNo?: string;
+};
+
+type PaymentOpenUrlPayload = {
+  provider: "allinpay" | string;
+  url: string;
+  orderNumbers: string;
+  bizOrderNo?: string;
+};
+```
+
+### H5 / App 边界
+
+- H5 调 Java `/p/order/pay` 和通联状态回查接口，负责生成和刷新收银台业务状态。
+- App 负责真实支付宝/微信 SDK 拉起、外部 URL 打开、安全白名单、用户取消和 SDK 回调归一化。
+- App 返回 `status=success/paid` 时 H5 进入支付成功页；返回 `cancelled/failed/unknown` 时 H5 展示可重试或待确认状态。
+- `payment.openUrl` 在生产 App 中必须校验 URL scheme / host 白名单；debug receiver 可只作为通道验证，不代表生产安全策略。
 
 ## 首批能力明细
 
