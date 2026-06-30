@@ -460,10 +460,13 @@ bash scripts/deploy/h5-jenkins-release.sh
 
 ```text
 GET  /platform/h5Release/active?environment=test
+GET  /platform/h5Release/list?environment=test
 POST /platform/h5Release
 ```
 
 active manifest、注册、promote、gray、rollback 接口按 Java `data` wrapper 兼容解析；如果接口直接返回业务对象，也会按业务对象处理。
+
+旧 Python/prod active manifest 只能作为历史生产链路兜底，不能作为 Jenkins/Java 测试发版审核的线上版本来源。当前测试发版线上 active 版本必须以 Java H5 版本管理为准。
 
 ### 启动本地 Jenkins
 
@@ -503,16 +506,88 @@ Jenkins 页面只需要选择：
 该配置文件保存：
 
 - H5 固定仓库：`git@github.com:Tycalwayslove/hybird-meumall.git`
-- Java H5版本管理 active manifest base URL 和 token。测试环境读取前缀为 `https://test.aigcpop.com/mini_h5`，与 H5 运行时业务接口前缀一致。
-- Jenkins 注册 H5 版本记录的写接口属于管理系统前缀，测试环境为 `https://test.aigcpop.com:18088/apis`，通过 `JAVA_H5_RELEASE_REGISTER_API_BASE_URL` 配置。
+- Java H5 版本管理 active/list base URL 和 token。测试环境管理系统前缀为 `https://test.aigcpop.com:18088/apis`，通过 `JAVA_H5_RELEASE_API_BASE_URL` 配置。
+- Jenkins 注册 H5 版本记录的写接口同样属于管理系统前缀，测试环境为 `https://test.aigcpop.com:18088/apis`，通过 `JAVA_H5_RELEASE_REGISTER_API_BASE_URL` 配置。
 - 注册写接口如需鉴权，配置 `JAVA_H5_RELEASE_REGISTER_TOKEN`；未配置时复用 `JAVA_H5_RELEASE_TOKEN`。若 Jenkins 报 `Unauthorized`，说明管理端注册接口尚未放行或 token 未配置。
 - H5 容器运行时业务接口仍从所选 H5 分支的 `config/env/h5.test.env` 读取 `JAVA_API_BASE_URL`。
 - 测试服务器 IP、用户、端口、目录、域名和 SSH 密码。
-- 是否注册 Java candidate、是否推 tag、是否清理旧 H5 容器/image/nginx location。
+- 是否注册 Java candidate、是否推 tag、是否清理旧 H5 容器/image/nginx location。测试环境默认 `REMOTE_KEEP_RELEASES=5`，即保留最近 5 个版本的容器、镜像、release 目录和 Nginx snippet。
+- 是否发送飞书审核群通知。测试环境默认 `SEND_FEISHU_REVIEW=true`，Jenkins 发版成功后只发送审核群待确认通报，不直接发送正式对接群。
 
 Jenkins 发版前不再要求本地 H5 工作区切到目标提交，也不要求提前创建 tag。Jenkins 会在独立工作目录拉取远程 H5 仓库的所选分支，部署和 smoke 通过后再创建并推送 `h5/vX.Y.Z` tag。
 
 默认版本号由 H5 仓库 `package.json` 的 major/minor 和远程 `h5/v*` tag 共同决定：同一 major/minor 下 patch 每次成功发版递增；当 `package.json` 从 `1.0.x` 升到 `2.0.0` 时，默认从 `v2.0.0` 开始。
+
+同一个 Git commit 默认只能生成一个 H5 版本。Jenkins 会在构建前检查：
+
+- 当前 commit 是否已经存在 `h5/v*` tag。
+- Java H5 版本列表中是否已经存在相同 `buildMeta.gitCommit`。
+
+命中任一条件时，构建会在 Docker build 前失败。只有人工确认需要重发同一 commit 时，才允许临时设置：
+
+```bash
+ALLOW_REPEAT_H5_COMMIT_RELEASE=true
+```
+
+Java H5版本管理也应在注册接口侧做同样约束：同一 `environment + buildMeta.gitCommit` 不允许创建多个 release 版本，除非显式走重发/覆盖语义。
+
+### 飞书通知流程
+
+Jenkins 发版成功后自动执行：
+
+```bash
+pnpm run feishu:h5-release-notice -- request-review --version vX.Y.Z --git-tag h5/vX.Y.Z
+```
+
+这一步只发送到审核群。审核通过后，再人工执行：
+
+```bash
+pnpm run feishu:h5-release-approve
+pnpm run feishu:h5-release-notice -- send-approved --version vX.Y.Z --git-tag h5/vX.Y.Z
+```
+
+正式对接群只允许通过 `send-approved` 发送，避免未审核内容直接打扰对接群。
+
+### 发版审核基准确认
+
+每次发送飞书审核前，必须先确认当前 Java active 和本次目标版本，不能沿用旧聊天上下文或旧 Python/prod manifest。
+
+标准确认步骤：
+
+```bash
+cd /Users/mac/person_code/meu-mall
+set -a
+. meumall-ci/config/h5-test-release.env
+set +a
+
+curl -kfsSL "${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV:-test}"
+curl -kfsSL "${JAVA_H5_RELEASE_REGISTER_API_BASE_URL%/}/platform/h5Release/list?environment=${H5_RELEASE_ENV:-test}"
+```
+
+需要从返回中记录：
+
+- 当前线上 `activeVersion`：active manifest 的 `stableVersion`。
+- 当前线上 `activeCommit`：list 中 `status=active` 且 `version=activeVersion` 的 `buildMeta.gitCommit`。
+- 本次待审核 `targetVersion`：Jenkins 本次生成的版本号，例如 `v1.0.22`。
+- 本次待审核 `targetCommit`：list 中目标版本的 `buildMeta.gitCommit`，或目标 tag `h5/vX.Y.Z` 反查出的 commit。
+- 本次 diff：`activeCommit..targetCommit`。
+
+改动统计命令：
+
+```bash
+git -C hybird-meumall log --oneline <activeCommit>..<targetCommit>
+git -C hybird-meumall diff --shortstat <activeCommit>..<targetCommit>
+```
+
+审核消息必须写清楚：
+
+```text
+当前线上 active：vX.Y.Z / <activeCommitShort>
+本次待审核版本：vA.B.C / <targetCommitShort>
+对比范围：<activeCommitShort>..<targetCommitShort>
+```
+
+如果 Java active 接口的 `data` 字段是 JSON 字符串，需要先把外层响应解析成对象，再把 `data` 字符串二次解析为 manifest。若 active 接口只能拿到 manifest，commit 必须从 Java list 的 `buildMeta.gitCommit` 补齐。
 
 ## 回滚流程
 

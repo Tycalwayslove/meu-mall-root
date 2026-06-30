@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "../..");
-const h5Dir = path.join(rootDir, "hybird-meumall");
+const h5Dir = process.env.H5_RELEASE_NOTICE_H5_DIR || path.join(rootDir, "hybird-meumall");
 const generatedDir = path.join(rootDir, ".ai-workspace/release-notices/generated");
 const exampleConfigPath = path.join(
   rootDir,

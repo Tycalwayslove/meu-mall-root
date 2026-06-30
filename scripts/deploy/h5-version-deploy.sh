@@ -43,7 +43,7 @@ if [ "${REGISTER_RELEASE:-true}" = "true" ] && [ -z "${JAVA_H5_RELEASE_REGISTER_
   echo "JAVA_H5_RELEASE_REGISTER_API_BASE_URL 不能为空；注册 H5 版本记录需要管理系统接口前缀。" >&2
   exit 2
 fi
-PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}}"
+PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active}"
 SERVER_H5_MANIFEST_URL="${SERVER_H5_MANIFEST_URL:-${PUBLIC_H5_MANIFEST_URL}}"
 REQUIRE_EXISTING_TAG="${REQUIRE_EXISTING_TAG:-true}"
 PUSH_TAG_AFTER_RELEASE="${PUSH_TAG_AFTER_RELEASE:-false}"
@@ -65,7 +65,7 @@ resolve_git_commit() {
 }
 
 active_manifest_stable_version() {
-  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}"
+  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active"
   JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN}" python3 - "${manifest_url}" <<'PY'
 import json
 import os
@@ -84,7 +84,12 @@ try:
 except Exception:
     sys.exit(0)
 
-manifest = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), dict) else payload
+manifest = payload.get("data") if isinstance(payload, dict) and payload.get("data") is not None else payload
+if isinstance(manifest, str):
+    try:
+        manifest = json.loads(manifest)
+    except Exception:
+        manifest = {}
 stable_version = manifest.get("stableVersion") if isinstance(manifest, dict) else None
 if stable_version:
     print(stable_version)
@@ -153,7 +158,7 @@ if [ -z "${ROLLBACK_VERSION}" ]; then
     ROLLBACK_VERSION="${H5_VERSION}"
     echo "Java active manifest 暂不可用，按初始版本使用自身作为 rollbackVersion：${ROLLBACK_VERSION}" >&2
   else
-    echo "无法从 Java active manifest 读取 rollbackVersion 来源：${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}" >&2
+    echo "无法从 Java active manifest 读取 rollbackVersion 来源：${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active" >&2
     exit 2
   fi
 fi
@@ -717,7 +722,11 @@ PY
 }
 
 send_feishu_release_review() {
-  local review_args=("run" "feishu:h5-release-notice" "--" "request-review")
+  local review_args=(
+    "run" "feishu:h5-release-notice" "--" "request-review"
+    "--version" "${H5_VERSION}"
+    "--git-tag" "${REQUIRED_GIT_TAG}"
+  )
 
   if [ "${FEISHU_REVIEW_DRY_RUN}" = "true" ]; then
     review_args+=("--dry-run")
@@ -725,7 +734,7 @@ send_feishu_release_review() {
 
   (
     cd "${ROOT_DIR}"
-    pnpm "${review_args[@]}"
+    H5_RELEASE_NOTICE_H5_DIR="${H5_SOURCE_DIR}" pnpm "${review_args[@]}"
   )
 }
 
@@ -778,27 +787,47 @@ current_image='${H5_IMAGE}'
 current_version='${H5_VERSION}'
 current_snippet='${SAFE_VERSION}.conf'
 
+keep_versions="\$(find releases/h5 -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -V | tail -n "\${keep}" || true)"
+if ! printf '%s\n' "\${keep_versions}" | grep -qx "\${current_version}"; then
+  keep_versions="\$(printf '%s\n%s\n' "\${keep_versions}" "\${current_version}" | sed '/^$/d' | sort -uV)"
+fi
+
+is_kept_version() {
+  printf '%s\n' "\${keep_versions}" | grep -qx "\$1"
+}
+
+echo "Keeping H5 versions:"
+printf '%s\n' "\${keep_versions}"
+
 docker ps -a --format '{{.Names}}' | grep '^meu-mall-h5-' | while read -r name; do
-  if [ "\${name}" != "\${current_container}" ]; then
+  version="\${name#meu-mall-h5-}"
+  if ! is_kept_version "\${version}"; then
     docker rm -f "\${name}" >/dev/null 2>&1 || true
   fi
 done
 
 docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | awk '\$1 ~ /^meu-mall\\/h5:/ {print \$1}' | while read -r image; do
-  if [ "\${image}" != "\${current_image}" ]; then
+  version="\${image#meu-mall/h5:}"
+  if ! is_kept_version "\${version}"; then
     docker rmi "\${image}" >/dev/null 2>&1 || true
   fi
 done
 
 find releases/h5 -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while read -r dir; do
-  if [ "\$(basename "\${dir}")" != "\${current_version}" ]; then
+  version="\$(basename "\${dir}")"
+  if ! is_kept_version "\${version}"; then
     rm -rf "\${dir}"
   fi
 done
 
 for dir in /etc/nginx/conf.d/meu-mall-h5-versions /opt/mail4j/nginx/conf.d/meu-mall-h5-versions; do
   if [ -d "\${dir}" ]; then
-    find "\${dir}" -maxdepth 1 -type f -name '*.conf' ! -name "\${current_snippet}" -delete
+    find "\${dir}" -maxdepth 1 -type f -name '*.conf' | while read -r file; do
+      version="\$(basename "\${file}" .conf)"
+      if ! is_kept_version "\${version}"; then
+        rm -f "\${file}"
+      fi
+    done
   fi
 done
 

@@ -50,15 +50,48 @@ H5 飞书通报分为两类，不能混在一条消息里讲。
 
 | 信息 | 来源 |
 | --- | --- |
-| H5 版本号 | `hybird-meumall/package.json` |
-| Git tag | `h5/v{package.json version}` |
-| Git commit | `hybird-meumall` 当前 HEAD |
+| 待审核 H5 版本号 | Jenkins 发版参数 `--version vX.Y.Z`，或 Java H5 版本管理列表中的目标 release；Jenkins 迁移后禁止再用 `hybird-meumall/package.json` 直接当作待审核版本 |
+| 待审核 Git tag | Jenkins 发版参数 `--git-tag h5/vX.Y.Z`，或 Java H5 版本管理 `buildMeta.gitTag` |
+| 待审核 Git commit | Java H5 版本管理目标 release 的 `buildMeta.gitCommit`；缺失时再用 `h5/vX.Y.Z` tag 反查 |
+| 当前线上 active 版本 | Java H5 版本管理 active 接口：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active?environment={env}` |
+| 当前线上 active commit | Java H5 版本管理 list 接口中 `status=active` 且 `version=active.stableVersion` 的 `buildMeta.gitCommit`；active 接口只有 manifest 时必须再查 list 或用 `h5/{stableVersion}` tag 反查 |
+| 版本 diff 范围 | `git log --oneline <activeCommit>..<targetCommit>` 和 `git diff --shortstat <activeCommit>..<targetCommit>` |
 | 变更摘要 | `hybird-meumall/.ai/CHANGE_SUMMARY.md` |
 | 验证记录 | `hybird-meumall/.ai/test-reports/` |
 | release 注册记录 | `hybird-meumall/archives/releases/{version}/` |
-| active manifest | `https://hybird.aigcpop.com/api/h5/manifest/active?environment=prod` |
+| 旧 Python active manifest | 仅作为历史生产链路兜底：`https://hybird.aigcpop.com/api/h5/manifest/active?environment=prod`；Jenkins/Java H5 测试发版审核不得用它判断当前线上版本 |
 | 页面和对接范围 | `.ai-workspace/product/page-inventory.md`、`.ai-workspace/integration-briefs/` |
 | 排期计划 | 飞书多维表格，当前由 `.ai-workspace/H5_FEISHU_BASE_SCHEDULE_WORKFLOW.md` 约束 |
+
+## 发审核前强制基准确认
+
+单版本发版审核消息发送前，必须先确认“当前线上 active 版本”和“本次待审核版本”的版本号、Git tag、Git commit。这个步骤是硬门禁，不能用聊天上下文、上一次发版通知、`package.json version` 或最近 tag 代替。
+
+Jenkins/Java 测试发版的标准取数顺序：
+
+1. 读取当前环境配置，例如 `meumall-ci/config/h5-test-release.env` 中的 `H5_RELEASE_ENV`、`JAVA_H5_RELEASE_API_BASE_URL`、`JAVA_H5_RELEASE_REGISTER_API_BASE_URL`。
+2. 查询 Java active：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active?environment={H5_RELEASE_ENV}`，得到当前 active 的 `stableVersion`、`rollbackVersion`、`assets.basePath`。
+3. 查询 Java list：`GET {JAVA_H5_RELEASE_REGISTER_API_BASE_URL}/platform/h5Release/list?environment={H5_RELEASE_ENV}`，找到：
+   - `status=active` 且 `version=active.stableVersion` 的线上版本记录，读取 `buildMeta.gitCommit` 作为 `activeCommit`。
+   - 本次待审核版本记录，读取 `buildMeta.gitCommit`、`buildMeta.gitTag`、`buildMeta.jenkinsBuildNumber`、`status` 作为 `targetCommit` 和发版元信息。
+4. 如果 Java active 的 `data` 是 JSON 字符串，必须二次解析；如果 active 接口只有 manifest 不含 `buildMeta`，必须用 Java list 或 `h5/<stableVersion>` tag 反查 commit。
+5. 生成改动统计必须使用 `activeCommit..targetCommit`，至少执行并记录：
+
+```bash
+git -C hybird-meumall log --oneline <activeCommit>..<targetCommit>
+git -C hybird-meumall diff --shortstat <activeCommit>..<targetCommit>
+```
+
+6. 只有在审核消息里同时写清楚 `activeVersion / activeCommit / targetVersion / targetCommit / diff range` 后，才能发送到审核群。
+
+如果本次待审核版本已经被 promote 成 active，不能再用“当前 active 等于目标版本”生成空 diff；必须改用 Java release 记录里的 `rollbackVersion` 或上一条 active/published release 的 `buildMeta.gitCommit` 作为基准，并在审核消息中说明“目标版本已 active，本次对比基准改用上一线上版本”。
+
+禁止事项：
+
+- 禁止在 Jenkins/Java 发版审核中使用旧 Python prod active manifest 判断当前线上版本；该接口可能仍返回历史版本，例如 `v1.0.14`。
+- 禁止把 `hybird-meumall/package.json` 的 `version` 当作 Jenkins 生成的 H5 版本号；Jenkins 会按远程 tag 自动递增版本。
+- 禁止只按 `h5/v*` 最近 tag 推断线上版本；线上 active 必须以 Java H5 版本管理为准。
+- 禁止在无法确认 `activeCommit` 或 `targetCommit` 时发送审核消息；只能先发“取数失败/需补 token 或权限”的说明。
 
 ## 角色和群
 
