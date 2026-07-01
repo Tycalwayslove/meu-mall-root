@@ -107,25 +107,33 @@ H5 BFF 转 Java `/p/order/pay`：
       "type": "native-sdk",
       "provider": "allinpay",
       "settlementProvider": "allinpay",
-      "paymentMode": "wechat-mini-program",
-      "bizOrderNo": "TL202606300001",
+      "paymentMode": "allinpay-mini-program-bridge",
+      "bizOrderNo": "2606300000012651",
       "paymentPayload": {
-        "cusid": "990581007426001",
-        "appid": "002",
-        "trxamt": "12990",
-        "reqsn": "O202606300001"
+        "result": "0",
+        "reqTraceNum": "2606300000012651",
+        "respTraceNum": "20260630173754208901021131",
+        "chnlFrontParamInfo": "{\"appletPayParams\":\"{\\\"reqsn\\\":\\\"20260630173754208901021131\\\",\\\"cusid\\\":\\\"660584053996480\\\",\\\"trxamt\\\":\\\"1\\\"}\"}",
+        "respCode": "66666",
+        "respMsg": "业务已受理"
+      },
+      "chnlFrontParamInfo": {
+        "appletPayParams": "{\"reqsn\":\"20260630173754208901021131\",\"cusid\":\"660584053996480\",\"trxamt\":\"1\"}"
       },
       "miniProgram": {
         "type": "wechat",
-        "appId": "wxef277996acc166c3",
-        "originalId": "gh_e64a1a89a0ad",
-        "path": "pages/orderDetail/orderDetail?cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
-        "queryString": "cusid=990581007426001&appid=002&trxamt=12990&reqsn=O202606300001",
-        "query": {
-          "cusid": "990581007426001",
-          "appid": "002",
-          "trxamt": "12990",
-          "reqsn": "O202606300001"
+        "appId": "wx264f4850dc92b03d",
+        "cashierAppId": "wxef277996acc166c3",
+        "launchMode": "embedded-mini-program",
+        "path": "package-pay/pages/allinpay-bridge/allinpay-bridge",
+        "extraData": {
+          "allinpayParams": {
+            "appletPayParams": "{\"reqsn\":\"20260630173754208901021131\",\"cusid\":\"660584053996480\",\"trxamt\":\"1\"}"
+          },
+          "orderNumbers": "O202606300001",
+          "bizOrderNo": "2606300000012651",
+          "reqsn": "20260630173754208901021131",
+          "returnToCaller": true
         }
       }
     }
@@ -144,15 +152,15 @@ H5 BFF 转 Java `/p/order/pay`：
 
 | 类型 | 说明 | H5 处理 |
 | --- | --- | --- |
-| `native-sdk` | App 支付 SDK 参数；`paymentMode=wechat-mini-program` 时表示通联微信小程序收银台参数。 | 调 `rpc/payment.pay`。 |
+| `native-sdk` | App 支付 SDK 参数；`paymentMode=allinpay-mini-program-bridge` 时表示通联微信小程序支付桥参数。 | 调 `rpc/paymentStartCashier`。 |
 | `open-url` | 通联或支付宝外部 URL。 | 调 `rpc/payment.openUrl`。 |
 | `paid` | 纯积分或无需支付。 | 直接进入成功结果。 |
 
 通联分流规则：
 
 - `paySettlementType=1 + payType=7`：H5 BFF 从 `/p/order/pay` 读取 `miniprogramPayInfo_VSP`，再调 Java `/p/allinpay/order/getAliAppPayUrl` 换取支付宝 URL，返回 `execution.type="open-url"`。
-- `paySettlementType=1 + payType=8`：H5 BFF 从 `/p/order/pay` 读取 `miniprogramPayInfo_VSP/miniprogramPayInfo/miniProgramPayInfo/payInfo/wxPayInfo` 或顶层通联字段，生成 `execution.type="native-sdk"`、`provider="allinpay"`、`paymentMode="wechat-mini-program"`、`miniProgram` 和原始 `paymentPayload`。
-- `miniProgram.path` 固定以 `pages/orderDetail/orderDetail` 为页面路径，query 来自后端通联支付字段，H5 不自行新增签名字段。
+- `paySettlementType=1 + payType=8`：H5 BFF 将 `/p/order/pay` 返回的完整 `data` 放入 `execution.paymentPayload`；当 `data.result == 0` 且 `data.chnlFrontParamInfo` 可解析时，解析为 `execution.chnlFrontParamInfo` 并把对象内所有顶层参数传给 App，同时派生 `miniProgram.extraData.allinpayParams`，生成 `execution.type="native-sdk"`、`provider="allinpay"` 和 `paymentMode="allinpay-mini-program-bridge"`。历史兼容字段 `miniprogramPayInfo_VSP/miniprogramPayInfo/miniProgramPayInfo/payInfo/wxPayInfo` 仍作为 fallback。
+- `miniProgram.path` 固定为喵呜小程序支付桥页 `package-pay/pages/allinpay-bridge/allinpay-bridge`；通联支付字段只放在 `miniProgram.extraData.allinpayParams`，H5 不自行新增签名字段，也不要求 App 直接打开通联收银台小程序。
 
 ### GET `/api/bff/allinpay-order-status`
 

@@ -195,7 +195,7 @@ App 必须提供：
 | 切换一级 tab | `router/navigate` route=`tab` | H5 -> Native | H5 请求原生切 tab。 | H5 路由跳转。 |
 | 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`login`。 | 业务自行决定 H5 fallback。 |
 | 地址管理 | `rpc/address.*` | H5 -> Native | H5 商品详情、订单确认和地址管理页优先通过 App 获取/管理地址。 | 回退 H5 BFF `/api/bff/address/*`。 |
-| App 内支付 | `rpc/payment.pay` | H5 -> Native | H5 收银台请求 App 按后端支付参数拉起支付宝/微信 SDK；通联微信走微信小程序收银台。 | 不降级到浏览器支付，提示在 App 内完成。 |
+| App 内支付 | `rpc/paymentStartCashier` | H5 -> Native | H5 收银台请求 App 按后端支付参数拉起支付宝/微信 SDK；通联微信走喵呜小程序支付桥页。 | 不降级到浏览器支付，提示在 App 内完成。 |
 | 打开支付 URL | `rpc/payment.openUrl` | H5 -> Native | H5 收银台请求 App 打开通联等外部支付 URL。 | 浏览器调试可直接跳转 URL，App 内应走 Bridge。 |
 
 ### P2：后续高风险能力
@@ -282,7 +282,7 @@ type AddressLocation = {
 
 | action | payload | resolve data | 用途 |
 | --- | --- | --- | --- |
-| `payment.pay` | `{ provider, payType, orderNumbers, sdkPayload, paymentMode?, settlementProvider?, miniProgram?, bizOrderNo? }` | `{ status, message? }` | 普通 App 内支付宝/微信 SDK 支付，或通联微信小程序收银台。 |
+| `paymentStartCashier` | `{ provider, payType, orderNumbers, sdkPayload, paymentMode?, settlementProvider?, miniProgram?, bizOrderNo? }` | `{ status, message? }` | 普通 App 内支付宝/微信 SDK 支付，或通联微信小程序支付桥。 |
 | `payment.openUrl` | `{ provider: "allinpay", url, orderNumbers, bizOrderNo? }` | `{ opened, status, message? }` | 通联支付宝 URL 支付或后续其它支付 URL。 |
 
 ### Payload 字段
@@ -291,17 +291,26 @@ type AddressLocation = {
 type PaymentPayPayload = {
   provider: "alipay" | "wechat" | "allinpay" | string;
   settlementProvider?: "allinpay";
-  paymentMode?: "app-sdk" | "wechat-mini-program";
+  paymentMode?: "app-sdk" | "allinpay-mini-program-bridge";
   payType: 7 | 8 | 0 | number;
   orderNumbers: string;
+  /** Java /p/order/pay 返回的完整 data，H5 不裁剪。 */
   sdkPayload: unknown;
   bizOrderNo?: string;
+  /** data.chnlFrontParamInfo 可解析时的对象，顶层参数原样传给原生。 */
+  chnlFrontParamInfo?: Record<string, string>;
   miniProgram?: {
     appId: string;
-    originalId: string;
+    cashierAppId?: string;
+    extraData?: {
+      allinpayParams?: Record<string, string>;
+      orderNumbers?: string;
+      bizOrderNo?: string;
+      reqsn?: string;
+      returnToCaller?: boolean;
+    };
+    launchMode?: "embedded-mini-program";
     path: string;
-    query: Record<string, string>;
-    queryString: string;
     type: "wechat";
   };
 };
@@ -318,7 +327,8 @@ type PaymentOpenUrlPayload = {
 
 - H5 调 Java `/p/order/pay` 和通联状态回查接口，负责生成和刷新收银台业务状态。
 - App 负责真实支付宝/微信 SDK 拉起、通联微信小程序收银台拉起、外部 URL 打开、安全白名单、用户取消和 SDK 回调归一化。
-- `paymentMode=wechat-mini-program` 时，App 使用微信 OpenSDK 打开 `miniProgram.originalId=gh_e64a1a89a0ad` 和 `miniProgram.path`；打开成功但结果未知时返回 `status=unknown`，H5 进入结果页回查。
+- `paymentStartCashier.sdkPayload` 固定透传 Java `/p/order/pay` 返回的完整 `data`；`chnlFrontParamInfo` 是 H5 对 `sdkPayload.chnlFrontParamInfo` 的 JSON 解析结果；`miniProgram` 只是在通联微信模式下由 H5 派生的喵呜小程序支付桥拉起参数。
+- `paymentMode=allinpay-mini-program-bridge` 时，App 打开 `miniProgram.appId=wx264f4850dc92b03d`、`miniProgram.path=package-pay/pages/allinpay-bridge/allinpay-bridge`，并把 `miniProgram.extraData` 传入喵呜小程序；小程序桥页再把 `extraData.allinpayParams` 原样传给通联收银台 `wxef277996acc166c3`。打开成功但结果未知时返回 `status=unknown`，H5 进入结果页回查。
 - App 返回 `status=success/paid` 时 H5 进入支付成功页；返回 `cancelled/failed/unknown` 时 H5 展示可重试或待确认状态。
 - `payment.openUrl` 在生产 App 中必须校验 URL scheme / host 白名单；debug receiver 可只作为通道验证，不代表生产安全策略。
 
