@@ -193,7 +193,7 @@ App 必须提供：
 | 关闭 WebView | `rpc/closeWebView` 或 `router/back` | H5 -> Native | 关闭当前页面。 | `history.back()`。 |
 | 请求登录 | `event/need_login` | H5 -> Native | H5 发现未登录时请求原生登录。 | 展示未登录状态。 |
 | 切换一级 tab | `router/navigate` route=`tab` | H5 -> Native | H5 请求原生切 tab。 | H5 路由跳转。 |
-| 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`login`。 | 业务自行决定 H5 fallback。 |
+| 打开原生页 | `router/navigate` route=`<native-page>` | H5 -> Native | route 直接使用原生页面名，例如 `settings`、`address`、`history-wallet`、`login`。 | 业务自行决定 H5 fallback。 |
 | 地址管理 | `rpc/address.*` | H5 -> Native | H5 商品详情、订单确认和地址管理页优先通过 App 获取/管理地址。 | 回退 H5 BFF `/api/bff/address/*`。 |
 | App 内支付 | `rpc/paymentStartCashier` | H5 -> Native | H5 收银台请求 App 按后端支付参数拉起支付宝/微信 SDK；通联微信走喵呜小程序支付桥页。 | 不降级到浏览器支付，提示在 App 内完成。 |
 | 打开支付 URL | `rpc/payment.openUrl` | H5 -> Native | H5 收银台请求 App 打开通联等外部支付 URL。 | 浏览器调试可直接跳转 URL，App 内应走 Bridge。 |
@@ -441,7 +441,7 @@ H5 处理：
 }
 ```
 
-App dispatcher 需要直接按 `payload.route` 分发原生页，例如 `settings` 打开设置页、`address` 打开地址页；`payload.params` 只承载页面参数，不再承载目标页名称。
+App dispatcher 需要直接按 `payload.route` 分发原生页，例如 `settings` 打开设置页、`address` 打开地址页、`history-wallet` 打开历史钱包页；`payload.params` 只承载页面参数，不再承载目标页名称。
 
 ### `event/token_expired`
 
