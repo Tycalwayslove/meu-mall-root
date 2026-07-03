@@ -18,8 +18,10 @@
 
 ## H5 侧目标
 
-- `/promotion/activities` 展示当前达人可参与或待领奖的激励活动列表。
+- `/promotion/activities` 展示进行中和已暂停的激励活动列表；进行中使用 `displayStates=[1,2,3,4]`，已暂停使用 `displayStates=[0]`。
+- `/promotion/activities/history` 展示历史活动列表，使用 `displayStates=[6]`，且不再展示底部历史活动入口。
 - `/promotion/activities/[id]` 展示活动详情、个人进度、奖励规则和奖励领取入口。
+- `/promotion/activities/[id]/rules` 展示活动详情接口返回的 `ruleContent` 富文本。
 - 活动列表、详情、奖励详情失败时展示可恢复错误态，不拼接本地 mock。
 
 ## 页面范围
@@ -27,13 +29,17 @@
 | 页面 | 路由 | 端归属 | 说明 |
 | --- | --- | --- | --- |
 | 活动中心 | `/promotion/activities` | H5 | 活动列表，入口来自推广首页 |
+| 历史活动 | `/promotion/activities/history` | H5 | 活动中心底部入口进入，只展示历史活动列表 |
 | 活动详情 | `/promotion/activities/[id]` | H5 | 活动规则、个人进度、奖励节点 |
+| 活动规则 | `/promotion/activities/[id]/rules` | H5 | 从活动详情右上角进入，展示 `ruleContent` |
 
 ## 数据流
 
 ```text
-用户进入活动中心 -> H5 BFF -> Java 达人激励活动 APP 接口 -> H5 mapper -> 页面真实数据/空态/错态
-用户进入活动详情 -> H5 BFF detail + reward detail -> H5 mapper -> 详情页
+用户进入活动中心 -> H5 BFF 两次查询 displayStates=[1,2,3,4] 和 [0] -> Java 达人激励活动 APP 接口 -> H5 mapper -> 页面真实数据/空态/错态
+用户进入历史活动 -> H5 BFF 查询 displayStates=[6] -> Java 达人激励活动 APP 接口 -> H5 mapper -> 历史活动真实数据/空态/错态
+用户进入活动详情 -> H5 BFF detail -> H5 mapper -> 详情页
+用户点击活动规则 -> H5 BFF detail -> H5 mapper -> 规则页展示 ruleContent
 用户领取奖励 -> H5 BFF PATCH -> Java receive 接口 -> H5 刷新详情或展示结果
 ```
 
@@ -101,15 +107,17 @@
 - 联调步骤：
   1. 写入或注入有效 `mallToken`。
   2. 打开 `/hybird/promotion/activities`。
-  3. 点击活动进入 `/hybird/promotion/activities/<id>`。
-  4. 对有可领取奖励的记录调用领取接口。
+  3. 点击底部“历史活动”进入 `/hybird/promotion/activities/history`。
+  4. 点击活动进入 `/hybird/promotion/activities/<id>`。
+  5. 点击详情页右上角“活动规则”进入 `/hybird/promotion/activities/<id>/rules`。
+  6. 对有可领取奖励的记录调用领取接口。
 - 联调阶段是否已移除页面 mock 兜底：是。
 
 ## 真实接口渲染规则
 
 - 首屏展示骨架或 loading，不展示 mock 业务数据。
 - 接口成功后只渲染真实接口返回并经过 mapper 处理的数据。
-- 列表为空展示业务空态。
+- 活动中心进行中、已暂停、历史活动均支持列表空态、骨架屏和分页加载更多。
 - 接口失败、超时、鉴权失败展示错误态或未登录态，不回退 mock。
 - BFF mapper 可以跳过字段不完整的奖励明细，但不能补齐本地活动。
 
@@ -124,6 +132,9 @@
 
 - [ ] H5 页面成功状态可用。
 - [ ] H5 页面 loading、error、empty 状态可用。
+- [ ] 活动中心分别请求 `displayStates=[1,2,3,4]` 和 `[0]`，历史活动请求 `[6]`。
+- [ ] 活动中心底部展示历史活动入口，历史活动页不展示该入口。
+- [ ] 活动详情右上角展示“活动规则”，规则页展示 `ruleContent`。
 - [ ] 首屏 loading、接口成功、空数据空态、失败/重试状态均已验证。
 - [ ] 联调阶段未渲染或拼接 mock 业务数据。
 - [ ] API 契约与文档一致。
@@ -150,3 +161,4 @@ App 或 debug-login 注入 mallToken 后访问 /hybird/promotion/activities。
 | 日期 | 角色 | 结论 | 说明 |
 | --- | --- | --- | --- |
 | 2026-06-29 | H5 | 已完成 H5 侧实现与本地验证 | 后端真实 token 联调仍需在 App WebView 中确认 |
+| 2026-07-02 | H5 | 已按新分页口径补充活动中心与历史活动 | 活动中心双请求进行中/已暂停；历史页独立请求 `displayStates=[6]` |

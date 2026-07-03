@@ -6,7 +6,7 @@ verified
 
 ## 目标
 
-将 H5 推广活动中心 `/promotion/activities` 和活动详情 `/promotion/activities/[id]` 从本地 mock 切换到 Apifox “达人激励活动接口” APP 侧四个接口，支持真实活动列表、活动详情、奖励详情和领取奖励入口。
+将 H5 推广活动中心 `/promotion/activities`、历史活动 `/promotion/activities/history`、活动详情 `/promotion/activities/[id]` 和活动规则 `/promotion/activities/[id]/rules` 从本地 mock 切换到 Apifox “达人激励活动接口” APP 侧接口，支持真实活动列表、历史活动列表、活动详情、规则内容、奖励详情和领取奖励入口。
 
 ## 背景
 
@@ -21,7 +21,10 @@ verified
 
 - 包含：
   - `/api/bff/promotion/activities` 调 Java `/p/app/distribution/incentive/page`。
+  - 活动中心首屏两次查询：`displayStates=[1,2,3,4]` 获取进行中，`displayStates=[0]` 获取已暂停。
+  - 历史活动页 `/promotion/activities/history` 查询 `displayStates=[6]`。
   - `/api/bff/promotion/activities/[id]` 调 Java `/p/app/distribution/incentive/detail/{id}`。
+  - 活动规则页 `/promotion/activities/[id]/rules` 复用详情 BFF，展示 `ruleContent`。
   - `/api/bff/promotion/activities/[id]/reward` 调 Java `/p/app/distribution/incentive/reward/detail/{id}`。
   - `/api/bff/promotion/activities/rewards/[recordId]/receive` 转发领取奖励 PATCH。
   - `/promotion/activities` 和 `/promotion/activities/[id]` 使用真实 BFF 数据。
@@ -62,7 +65,9 @@ verified
 ## 验收标准
 
 - [ ] `/promotion/activities` 首屏使用真实 BFF，成功、空数据、失败状态均可展示。
+- [ ] `/promotion/activities/history` 使用真实 BFF，成功、空数据、失败和分页加载更多状态均可展示。
 - [ ] `/promotion/activities/[id]` 使用真实详情和奖励信息，非法 id 或接口失败不渲染 mock。
+- [ ] `/promotion/activities/[id]/rules` 展示真实 `ruleContent`，从详情页右上角“活动规则”进入。
 - [ ] 领取奖励 BFF 支持 PATCH 转发 `addressId`。
 - [ ] 接口 mapper 覆盖销量达标、GMV 达标、销量排行、GMV 排行四类活动字段。
 - [ ] `pnpm typecheck` 通过。
@@ -72,6 +77,7 @@ verified
 ## 验证命令
 
 - `pnpm exec vitest run src/features/promotion/promotion-incentive-activities-real-service.test.ts src/features/promotion/promotion-service.test.ts`
+- `pnpm exec vitest run src/features/promotion/promotion-incentive-activities-real-service.test.ts src/features/promotion/api.test.ts src/features/promotion/promotion-service.test.ts`
 - `pnpm typecheck`
 - `pnpm lint -- src/features/promotion/server/promotion-incentive-activities-real-service.ts src/features/promotion/components/PromotionActivitiesScreen.tsx src/features/promotion/components/PromotionActivityDetailScreen.tsx`
 - `pnpm run ai:check-docs-sync --strict`
@@ -92,3 +98,5 @@ verified
 
 - 2026-06-29：创建任务，依据 Apifox main 分支达人激励活动 APP 接口进入实现。
 - 2026-06-29：完成 H5 BFF、列表页、详情页、奖励详情和领取奖励接口接入；验证命令通过，状态更新为 `verified`。`pnpm lint -- ...` 会受仓库既有订单/收藏页面 react-hooks 错误影响，已用 `pnpm exec eslint <本次文件>` 精确验证本次文件，0 errors、2 个活动页既有 `<img>` warnings。
+- 2026-07-02：按新分页口径更新活动中心：进行中 `[1,2,3,4]`、已暂停 `[0]`、历史活动 `[6]`；新增历史活动页、底部入口、骨架屏、空态和加载更多。
+- 2026-07-02：活动详情右上角入口改为“活动规则”，新增 `/promotion/activities/[id]/rules` 展示详情接口 `ruleContent`。

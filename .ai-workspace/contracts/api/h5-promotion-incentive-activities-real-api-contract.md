@@ -13,7 +13,9 @@ Java 业务后端，Apifox 项目 `4403987` main 分支，“喵呜商城/APP接
 `hybird-meumall` H5 BFF 与页面：
 
 - `/promotion/activities`
+- `/promotion/activities/history`
 - `/promotion/activities/[id]`
+- `/promotion/activities/[id]/rules`
 
 ## 适用环境
 
@@ -36,7 +38,7 @@ Java 业务后端，Apifox 项目 `4403987` main 分支，“喵呜商城/APP接
 ### 活动分页
 
 ```http
-GET /p/app/distribution/incentive/page?current=1&size=10&orderBy=-createTime
+GET /p/app/distribution/incentive/page?current=1&size=10&orderBy=-createTime&displayStates=1&displayStates=2&displayStates=3&displayStates=4
 ```
 
 参数：
@@ -46,12 +48,19 @@ GET /p/app/distribution/incentive/page?current=1&size=10&orderBy=-createTime
 | `current` | query | integer | 否 | 当前页，默认 1 |
 | `size` | query | integer | 否 | 每页条数，默认 10 |
 | `orderBy` | query | string | 否 | 排序字段，例如 `+createTime,-sales` |
+| `displayStates` | query | integer[] | 否 | 活动展示状态；重复 query 传参。活动中心进行中传 `[1,2,3,4]`，已暂停传 `[0]`，历史活动传 `[6]` |
 
 H5 BFF：
 
 ```http
-GET /api/bff/promotion/activities?current=1&size=10
+GET /api/bff/promotion/activities?current=1&size=10&displayStates=1&displayStates=2&displayStates=3&displayStates=4
 ```
+
+页面调用规则：
+
+- `/promotion/activities` 首屏并发调用两次列表 BFF：`displayStates=[1,2,3,4]` 渲染进行中区域，`displayStates=[0]` 渲染已暂停区域。
+- `/promotion/activities/history` 调用一次列表 BFF：`displayStates=[6]` 渲染历史活动。
+- 列表返回的 `ongoingActivityCount` 作为活动中心“当前 N 个进行中”的权威数量。
 
 ### 活动详情
 
@@ -64,6 +73,13 @@ H5 BFF：
 ```http
 GET /api/bff/promotion/activities/{id}
 ```
+
+页面调用规则：
+
+- `/promotion/activities/[id]` 当前只强依赖活动详情接口，不主动聚合奖励详情接口；未拿到奖励详情时隐藏“我的奖励”区块。
+- `/promotion/activities/[id]/rules` 复用同一个详情 BFF，展示 `ruleContent` 清洗后的富文本。
+- 活动详情导航栏右侧入口为“活动规则”，不再直接展示“奖励记录”入口。
+- 活动详情主按钮按 `displayState` 映射：`0/1/3` 不展示按钮，`2` 展示“去带货”，`4` 展示“去领奖”，`5` 展示“查看奖励”。
 
 ### 奖励详情
 
@@ -126,13 +142,20 @@ type H5BffResult<T> =
 | `title` | string | 活动标题 |
 | `description` | string | 活动描述 |
 | `incentiveType` | integer | 1 销量达标，2 GMV 达标，3 销量排行，4 GMV 排行 |
-| `displayState` | integer | 0 已暂停，1 未开始，2 进行中，3 待结算，4 领奖中，5 已结束 |
+| `displayState` | integer | 0 已暂停，1 未开始，2 进行中，3 待结算，4 领奖中，5 已结束；历史活动按产品口径使用 6 |
 | `currentProgress` | integer | 达标类活动进度百分比 |
 | `saleCount` | integer | 销量达标累计销量 |
 | `gmv` | number | GMV 达标累计 GMV |
 | `saleRank` | integer | 销量排行当前名次 |
 | `gmvRank` | integer | GMV 排行当前名次 |
 | `rankThresholdVal` | integer | 排行类最次排名阈值 |
+
+分页 `DistributionIncentiveCardPageDistributionIncentiveCardPageVO`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `records/current/size/total/pages` | mixed | 标准分页字段 |
+| `ongoingActivityCount` | integer | 当前达人进行中活动数量，H5 活动中心顶部计数使用 |
 
 活动详情 `DistributionIncentiveAppDetailVO`：
 
@@ -164,12 +187,13 @@ type H5BffResult<T> =
 
 - H5 不依赖平台端接口。
 - `banner/ruleContent/reward details` 缺失时页面展示文本规则和占位，不拼接 mock 活动。
-- 活动列表空数组时展示空态。
+- 活动中心两个列表均为空时展示活动中心空态；单个分区为空时展示对应空态或隐藏空分区。
+- 历史活动列表空数组时展示历史活动空态；历史页不展示底部“历史活动”入口。
 
 ## 测试方式
 
 - Mapper 单测覆盖四类 `incentiveType`。
-- 页面渲染测试覆盖列表和详情。
+- 页面渲染测试覆盖活动中心、历史入口、历史页和详情。
 - BFF route 通过 typecheck 和 lint。
 - App token 联调访问 `/hybird/promotion/activities`。
 
