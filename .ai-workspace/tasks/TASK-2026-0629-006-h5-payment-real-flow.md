@@ -22,11 +22,11 @@ implemented
 包含：
 
 - `/pay-way` 发起真实普通订单支付。
-- H5 BFF 新增 `/api/bff/order-pay` 和 `/api/bff/allinpay-order-status`。
+- H5 BFF 新增 `/api/bff/order-pay`、`/api/bff/order-is-paid` 和历史兼容 `/api/bff/allinpay-order-status`。
 - `/api/bff/order-pay-info` 聚合 `paySettlementType`。
-- H5 Native Bridge 新增 `rpc/paymentStartCashier` 和 `rpc/payment.openUrl` 类型。
+- H5 Native Bridge 新增 `rpc/paymentStartAlipay`、`rpc/paymentStartWechat`，旧 `rpc/paymentStartCashier` 保留为 fallback，`rpc/payment.openUrl` 保留为历史 URL 打开能力。
 - App 调试 Bridge receiver 支持支付 RPC 占位和外部 URL 打开命令。
-- 新增 `/pay-result` 支付结果页，支持成功、失败、处理中和重新支付。
+- 新增 `/pay-result` 支付结果页，按订单号查询是否已支付，并支持手动查看支付状态和查看订单。
 - 同步 API、Bridge、页面盘点和对接文档。
 
 不包含：
@@ -49,8 +49,8 @@ implemented
 
 `app-meumall`：
 
-- 接收 `paymentStartCashier` 和 `payment.openUrl` RPC。
-- 调试阶段返回可测结果；真实 App 后续替换为支付宝/微信 SDK 和系统 openURL。
+- 接收 `paymentStartAlipay`、`paymentStartWechat` RPC，旧版本继续兼容 `paymentStartCashier`。
+- 调试阶段返回可测结果；真实 App 后续替换为支付宝/微信 SDK、通联小程序收银台和通联支付宝 URL 打开能力。
 
 ## 契约影响
 
@@ -73,13 +73,14 @@ implemented
 
 后端：
 
-- 保持 `/p/order/pay`、`/sys/config/paySettlementType`、`/p/allinpay/order/getAliAppPayUrl`、`/p/allinpay/order/getOrderStatus` 可用。
+- 保持 `/p/order/pay`、`/sys/config/paySettlementType`、`/p/allinpay/order/getAliAppPayUrl` 和 `/p/order/isPay/{payEntry}/{orderNumbers}` 可用。
 - 保持 `paySettlementType=1 + payType=8` 返回通联小程序支付字段，例如 `miniprogramPayInfo_VSP`。
 
 原生 App：
 
-- 实现 `rpc/paymentStartCashier` 调支付宝/微信 SDK；通联微信分支按 `miniProgram.appId/path/extraData` 打开喵呜小程序支付桥页。
-- 实现 `rpc/payment.openUrl` 打开通联或支付宝 URL。
+- 实现 `rpc/paymentStartAlipay`：普通支付宝调支付宝 SDK；通联支付宝在 `paymentMode=allinpay-url` 时使用 `paymentUrl` 打开通联支付 URL。
+- 实现 `rpc/paymentStartWechat`：普通微信调微信 SDK；通联微信在 `paymentMode=allinpay-mini-program-bridge` 时按 `sdkPayload/chnlFrontParamInfo` 直接打开通联小程序收银台。
+- 保留 `rpc/paymentStartCashier` 一个版本周期作为旧 App fallback。
 - 返回 `success/cancelled/failed/unknown`，H5 再回查订单状态。
 
 管理后台：
@@ -98,9 +99,9 @@ CI 或发布：
 - 联调步骤：
   1. 创建普通快递待支付订单进入 `/pay-way`。
   2. 验证 `/api/bff/order-pay-info` 返回 `paySettlementType=1`。
-  3. 支付宝点击支付后调用 `/p/order/pay` 和 `/p/allinpay/order/getAliAppPayUrl`，H5 通过 `payment.openUrl` 交给 App。
-  4. 回到 H5 后通过 `/api/bff/allinpay-order-status` 或 `/api/bff/order-pay-info` 回查。
-  5. 微信点击支付后，H5 应发出 `paymentStartCashier`，payload 包含 `provider=allinpay`、`settlementProvider=allinpay`、`paymentMode=allinpay-mini-program-bridge`、`miniProgram.appId=wx264f4850dc92b03d` 和 `miniProgram.path=package-pay/pages/allinpay-bridge/allinpay-bridge`。
+  3. 支付宝点击支付后调用 `/p/order/pay` 和 `/p/allinpay/order/getAliAppPayUrl`，H5 通过 `paymentStartAlipay` 交给 App，payload 包含完整 `sdkPayload`、`paymentMode=allinpay-url` 和 `paymentUrl`。
+  4. 回到 H5 后通过 `/api/bff/order-is-paid?payEntry=0&orderNumbers=<orderNumbers>` 回查。
+  5. 微信点击支付后，H5 应发出 `paymentStartWechat`，payload 包含 `provider=allinpay`、`settlementProvider=allinpay`、`paymentMode=allinpay-mini-program-bridge`、完整 `sdkPayload` 和解析后的 `chnlFrontParamInfo`；随后 H5 立即 replace 到 `/pay-result`。
 - H5 fallback：Bridge 不可用或超时时展示错误，不伪造支付成功。
 
 ## 实现计划
@@ -115,10 +116,10 @@ CI 或发布：
 ## 验收标准
 
 - [x] `/pay-way` 加载时读取订单支付信息、支付开关和 `paySettlementType`。
-- [x] 支付宝普通/通联分支都通过 `/api/bff/order-pay` 生成 Native SDK 或 openURL 执行动作，`paymentStartCashier.sdkPayload` 透传 `/p/order/pay` 完整 `data`。
+- [x] 支付宝普通/通联分支都通过 `/api/bff/order-pay` 生成 Native SDK 或通联 URL 执行动作，`paymentStartAlipay.sdkPayload` 透传 `/p/order/pay` 完整 `data`，旧 `paymentStartCashier` 仅作 fallback。
 - [x] 微信支付分支可根据后端返回字段走普通 Native SDK；测试环境通联微信分支已生成 `allinpay-mini-program-bridge` Bridge payload，并保留 debugRaw 便于联调。
 - [x] Bridge 不可用、支付取消、支付失败、支付处理中都有明确 UI。
-- [x] `/pay-result` 可展示成功、失败、处理中，并支持重新支付和查看订单。
+- [x] `/pay-result` 可按订单号展示成功、暂未支付成功和等待结果，并支持查看支付状态和查看订单。
 - [x] API 和 Native Bridge 契约与实现一致。
 - [x] 验证命令有记录。
 
@@ -151,7 +152,8 @@ xcodebuild test -project meumall.xcodeproj -scheme meumall -destination 'platfor
 ## 风险和阻塞
 
 - App 真正调用支付宝/微信 SDK 需要原生依赖和平台配置，本任务先补 Bridge 契约和 debug receiver。
-- 通联微信 App 需要实现打开喵呜小程序支付桥页，并在真机确认 launch/cancel/fail/unknown 回调口径。
+- App 需要新增 `paymentStartAlipay/paymentStartWechat` 两个专属 action；旧 `paymentStartCashier` 只作为 fallback，后续需要确认最低 App 版本。
+- 通联微信 App 需要实现按 `/p/order/pay` 返回参数直开通联小程序收银台，并在真机确认 launch/cancel/fail/unknown 回调口径。
 - 支付结果最终以订单状态回查为准，不能只信任 Native SDK 回调。
 
 ## 变更记录
@@ -169,3 +171,5 @@ xcodebuild test -project meumall.xcodeproj -scheme meumall -destination 'platfor
 | 2026-07-01 | synced | 已同步飞书：H5 与原生 App 对接说明 revision 99；H5 BFF/API 对接说明 revision 15；页面清单 revision 44。 |
 | 2026-07-01 | implemented | 支付 RPC action 从 `payment.pay` 改为无点命名 `paymentStartCashier`；通联微信链路修正为 App 打开喵呜小程序支付桥页，桥页再打开通联收银台。 |
 | 2026-07-01 | synced | 已同步飞书：H5 与原生 App 对接说明 revision 119；H5 BFF/API 对接说明 revision 16；页面清单 revision 45。 |
+| 2026-07-02 | implemented | 当前联调改为 App 直接打开通联小程序收银台；H5 发起 Bridge 后立即 replace 到 `/pay-result`，结果页新增 `/api/bff/order-is-paid` 按订单号查询支付状态，按钮固定为“查看支付状态 / 查看订单”。 |
+| 2026-07-03 | implemented | 支付 Bridge 按渠道拆分：支付宝走 `paymentStartAlipay`，微信走 `paymentStartWechat`，旧 `paymentStartCashier` 作为 unsupported fallback；通联支付宝改为专属支付宝 action 并透传完整 `sdkPayload` 与 `paymentUrl`。 |

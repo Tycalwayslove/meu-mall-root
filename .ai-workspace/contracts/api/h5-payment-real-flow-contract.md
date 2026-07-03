@@ -152,15 +152,47 @@ H5 BFF 转 Java `/p/order/pay`：
 
 | 类型 | 说明 | H5 处理 |
 | --- | --- | --- |
-| `native-sdk` | App 支付 SDK 参数；`paymentMode=allinpay-mini-program-bridge` 时表示通联微信小程序支付桥参数。 | 调 `rpc/paymentStartCashier`。 |
-| `open-url` | 通联或支付宝外部 URL。 | 调 `rpc/payment.openUrl`。 |
+| `native-sdk` | App 支付参数；`bridgeAction=paymentStartAlipay/paymentStartWechat` 决定调用支付宝或微信专属 Bridge。 | 调 `rpc/paymentStartAlipay` 或 `rpc/paymentStartWechat`；`unsupported` 时 fallback 到 `rpc/paymentStartCashier`。 |
+| `open-url` | 历史外部 URL。 | 历史兼容调 `rpc/payment.openUrl`；通联支付宝主链路已迁到 `native-sdk + paymentStartAlipay`。 |
 | `paid` | 纯积分或无需支付。 | 直接进入成功结果。 |
 
 通联分流规则：
 
-- `paySettlementType=1 + payType=7`：H5 BFF 从 `/p/order/pay` 读取 `miniprogramPayInfo_VSP`，再调 Java `/p/allinpay/order/getAliAppPayUrl` 换取支付宝 URL，返回 `execution.type="open-url"`。
-- `paySettlementType=1 + payType=8`：H5 BFF 将 `/p/order/pay` 返回的完整 `data` 放入 `execution.paymentPayload`；当 `data.result == 0` 且 `data.chnlFrontParamInfo` 可解析时，解析为 `execution.chnlFrontParamInfo` 并把对象内所有顶层参数传给 App，同时派生 `miniProgram.extraData.allinpayParams`，生成 `execution.type="native-sdk"`、`provider="allinpay"` 和 `paymentMode="allinpay-mini-program-bridge"`。历史兼容字段 `miniprogramPayInfo_VSP/miniprogramPayInfo/miniProgramPayInfo/payInfo/wxPayInfo` 仍作为 fallback。
-- `miniProgram.path` 固定为喵呜小程序支付桥页 `package-pay/pages/allinpay-bridge/allinpay-bridge`；通联支付字段只放在 `miniProgram.extraData.allinpayParams`，H5 不自行新增签名字段，也不要求 App 直接打开通联收银台小程序。
+- `paySettlementType=1 + payType=7`：H5 BFF 从 `/p/order/pay` 读取完整 `data` 放入 `execution.paymentPayload`，再调 Java `/p/allinpay/order/getAliAppPayUrl` 换取支付宝 URL，返回 `execution.type="native-sdk"`、`bridgeAction="paymentStartAlipay"`、`paymentMode="allinpay-url"`、`paymentUrl=<url>`。
+- `paySettlementType=1 + payType=8`：H5 BFF 将 `/p/order/pay` 返回的完整 `data` 放入 `execution.paymentPayload`；当 `data.result == 0` 且 `data.chnlFrontParamInfo` 可解析时，解析为 `execution.chnlFrontParamInfo` 并把对象内所有顶层参数传给 App，同时保留兼容字段 `miniProgram.extraData.allinpayParams`，生成 `execution.type="native-sdk"`、`bridgeAction="paymentStartWechat"`、`provider="allinpay"` 和 `paymentMode="allinpay-mini-program-bridge"`。历史兼容字段 `miniprogramPayInfo_VSP/miniprogramPayInfo/miniProgramPayInfo/payInfo/wxPayInfo` 仍作为 fallback。
+- App 当前实现以 `execution.paymentPayload` 和 `execution.chnlFrontParamInfo` 为准直接打开通联微信小程序收银台；`miniProgram` 仅作为历史兼容辅助字段，H5 不自行新增签名字段。
+
+### GET `/api/bff/order-is-paid`
+
+按订单号查询是否已支付，支付结果页自动查询和手动“查看支付状态”均使用该接口。
+
+Query：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `payEntry` | number | 是 | 支付入口，当前 H5 固定传 `0`。 |
+| `orderNumbers` | string | 是 | 订单号；多个订单号按 Java 接口约定拼接。 |
+
+后端调用：
+
+- `GET /p/order/isPay/{payEntry}/{orderNumbers}?orderNumbers=<orderNumbers>`
+
+响应：
+
+```json
+{
+  "view": {
+    "isPaid": true,
+    "normalizedStatus": "paid",
+    "orderNumbers": "O202607020001",
+    "payEntry": 0,
+    "statusText": "支付成功"
+  },
+  "modules": {
+    "orderIsPaid": true
+  }
+}
+```
 
 ### GET `/api/bff/allinpay-order-status`
 
@@ -209,7 +241,7 @@ Query：
 - 支付方式为空时禁用按钮。
 - `paySettlementType` 读取失败时按普通支付处理，但保留模块为空；测试环境应视为联调风险。
 - Bridge 不可用或超时不判定支付成功。
-- 支付结果最终以 `/p/order/getOrderPayInfoByOrderNumber` 或 `/p/allinpay/order/getOrderStatus` 为准。
+- 支付结果最终以 `/p/order/isPay/{payEntry}/{orderNumbers}` 为准；Java `data=false` 是合法未支付状态。
 
 ## 兼容性要求
 
