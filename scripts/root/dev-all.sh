@@ -189,7 +189,7 @@ start_h5() {
       H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-}" \
       JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-}" \
       PYTHON_API_BASE_URL="${PYTHON_API_BASE_URL:-}" \
-      pnpm exec next dev -H "${H5_HOST}" -p "${H5_PORT}"
+      pnpm exec next dev --webpack -H "${H5_HOST}" -p "${H5_PORT}"
   ) &
   remember_started "hybird-meumall" "$!"
 }

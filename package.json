@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bash scripts/root/dev-all.sh",
     "dev:server": "cd server-meumall && . .venv/bin/activate && python3 -m uvicorn app.main:app --host 127.0.0.1 --port 4100 --reload",
-    "dev:h5": "cd hybird-meumall && set -a && . config/env/h5.local.env && { [ ! -f ../.env.local ] || . ../.env.local; } && { [ ! -f .env.local ] || . .env.local; } && set +a && pnpm exec next dev -H ${H5_HOST:-localhost} -p ${H5_PORT:-3109}",
+    "dev:h5": "cd hybird-meumall && set -a && . config/env/h5.local.env && { [ ! -f ../.env.local ] || . ../.env.local; } && { [ ! -f .env.local ] || . .env.local; } && set +a && pnpm exec next dev --webpack -H ${H5_HOST:-localhost} -p ${H5_PORT:-3109}",
     "dev:admin": "cd admin-meumall && VITE_CONFIG_API_BASE_URL=http://127.0.0.1:4100 pnpm dev -- --host localhost --port 5173",
     "test:dev-script": "bash scripts/root/dev-lib.test.sh",
     "check": "bash scripts/root/check-all.sh",
