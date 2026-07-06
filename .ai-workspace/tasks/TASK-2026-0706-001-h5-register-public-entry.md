@@ -2,7 +2,7 @@
 
 ## 状态
 
-ready
+implemented
 
 ## 目标
 
@@ -14,16 +14,17 @@ ready
 
 ## 涉及项目
 
-- `server-meumall`：提供公开固定入口解析。
+- Node register resolver：提供公开固定入口解析。
 - `hybird-meumall`：继续承载 `/register` 页面和版本化发布。
-- 运维/nginx：需要将公网 `/register` 转发到 `server-meumall`。
+- 运维/nginx：需要将公网 `/register` 转发到 Node register resolver。
 
 ## 范围
 
-- 新增 `server-meumall` 的 `GET /register` public entry。
-- public entry 基于 active manifest 拼接当前 H5 版本注册页。
+- 新增独立 Node resolver 的 `GET /register` public entry。
+- public entry 基于 Java H5 版本管理 active manifest 拼接当前 H5 版本注册页。
 - 保留二维码 URL 中的运营 query 参数；测试和正式环境通过域名与部署实例区分，不使用 `environment` query。
-- 更新根级契约、对接说明、产品事实源和项目文档。
+- Jenkins 发版时同步并启动 resolver 容器，Nginx 精确代理公网 `/register`。
+- 更新根级契约、对接说明、H5 发版文档和项目文档。
 - 同步到飞书知识库。
 
 ## 不包含
@@ -32,12 +33,13 @@ ready
 - 不改变 H5 注册页业务表单、AES 加密、短信验证码或认证流程。
 - 不改变 App 内登录/注册策略；App 内仍不展示注册入口。
 - 不新增数据库 schema。
+- 不要求 Java 服务新增 `/register` 跳转接口。
 
 ## 责任边界
 
-- `server-meumall`：读取 active manifest，校验 active 版本声明 `/register` 路由，返回 302。
+- Node register resolver：按环境配置的 `JAVA_H5_RELEASE_API_BASE_URL` 请求 Java `GET /platform/h5Release/active`，校验 active 版本声明 `/register` 路由，返回 302。
 - `hybird-meumall`：确保发版 manifest routes 包含 `/register`，页面在版本 basePath 下可访问。
-- 运维/nginx：公网域名 `/register` 转发到 `server-meumall`，`/h5-v/<version>/` 继续转发到对应 H5 版本容器。
+- 运维/nginx：公网域名 `/register` 转发到 Node resolver，`/h5-v/<version>/` 继续转发到对应 H5 版本容器。
 - 运营：二维码固定使用 `https://hybird.aigcpop.com/register`，不直接使用版本化 URL。
 
 ## 契约影响
@@ -50,12 +52,12 @@ ready
 ## 对接说明
 
 - 对接说明：`.ai-workspace/integration-briefs/BRIEF-2026-0706-001-h5-register-public-entry.md`
-- 需要确认角色：运维、H5 发版负责人、运营。
-- 对方事项：nginx 代理、二维码投放口径、active manifest 包含 `/register`。
+- 需要确认角色：运维、H5 发版负责人、运营、Java H5 版本管理接口负责人。
+- 对方事项：nginx 代理、二维码投放口径、active manifest 包含 `/register`，Java active manifest endpoint 可访问。
 
 ## 对方责任
 
-- 运维确认 `GET /register` 的公网代理目标。
+- 运维确认 `GET /register` 的公网代理目标为 Node resolver。
 - H5 发版确认注册页所在版本容器持续运行且 manifest 已声明 `/register`。
 - 运营确认二维码只使用固定入口。
 
@@ -77,35 +79,43 @@ ready
 - [x] 运营 query 参数被保留。
 - [x] active manifest 未声明 `/register` 时返回 404。
 - [x] 不修改 H5 注册页业务逻辑。
-- [x] 更新 server、H5、根级契约和产品事实源。
+- [x] 更新 H5、根级契约和发版文档。
 - [x] 飞书知识库完成同步并回写链接。
 
 ## 验证命令
 
 ```bash
-cd /Users/mac/person_code/meu-mall/server-meumall
-. .venv/bin/activate
-pytest tests/test_api.py
-python scripts/ai/check_workflow.py
+cd /Users/mac/person_code/meu-mall
+bash -n scripts/deploy/h5-version-deploy.sh
+bash -n scripts/deploy/h5-jenkins-release.sh
+node --check scripts/register-resolver/server.js
+node scripts/register-resolver/test.js
 ```
 
 ## 发布影响
 
-- 需要运维新增公网 `/register` 代理。
+- Jenkins 发版会同步并启动 `meu-mall-register-resolver` 容器，默认监听 `127.0.0.1:4110`。
+- Nginx 模板新增公网 `/register` 精确代理，避免落到默认 H5 3109。
 - H5 发版脚本自动发现路由时必须包含 `/register`，否则 public entry 会返回 404，阻止跳到不存在页面。
 - 回滚 active manifest 后，固定入口会自动指向回滚版本的 `/register`。
 
 ## 风险和阻塞
 
 - 如果当前 active H5 版本未包含注册页，二维码入口会 404；上线前必须先发布并激活包含 `/register` 的版本。
-- 如果 nginx 未将 `/register` 转发到 `server-meumall`，公网入口不可用。
+- 如果 nginx 未将 `/register` 转发到 Node resolver，公网入口不可用。
+- 如果 Java active manifest endpoint 或 `JAVA_H5_RELEASE_API_BASE_URL` 配置错误，resolver 返回 502。
 
 ## 变更记录
 
-- 2026-07-06：创建工作项并实现 `server-meumall` public entry。
+- 2026-07-06：创建工作项；早期 `server-meumall` public entry 方案已被独立 Node resolver 方案取代。
 - 2026-07-06：同步飞书知识库：
   - 规则页：https://v05ctaei9gn.feishu.cn/wiki/P8bGwOGHuiW2elkUWBUcfiFpnQh，创建 revision 3，回写后 revision 4。
   - 页面盘点：https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre，更新至 revision 70。
   - H5 发版流程：https://v05ctaei9gn.feishu.cn/wiki/HyBpwTbNUigKsOkO2Qgc2rjBnie，更新至 revision 6。
 - 2026-07-06：按最新确认移除 `/register` 的 `environment` query 口径，测试/正式环境改由域名与部署实例区分。
 - 2026-07-06：同步飞书规则页最新口径，规则页 revision 更新至 6。
+- 2026-07-06：按最新确认改为独立 Node resolver，不要求 Java 或 `server-meumall` 新增 `/register`；resolver 读取环境配置的 Java H5 版本管理前缀，并调用不带 `environment` query 的 `GET /platform/h5Release/active`。
+- 2026-07-06：同步飞书知识库 Node resolver 口径：
+  - 规则页：https://v05ctaei9gn.feishu.cn/wiki/P8bGwOGHuiW2elkUWBUcfiFpnQh，revision 11。
+  - 页面盘点：https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre，revision 73。
+  - H5 发版流程：https://v05ctaei9gn.feishu.cn/wiki/HyBpwTbNUigKsOkO2Qgc2rjBnie，revision 7。

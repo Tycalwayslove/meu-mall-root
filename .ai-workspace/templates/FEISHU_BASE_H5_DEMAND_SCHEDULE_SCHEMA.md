@@ -54,7 +54,7 @@ MeuMall H5 需求排期
 
 ### 用途
 
-记录页面依赖的 Java、Python、BFF、管理后台配置等接口事项。
+记录页面依赖的 Java、H5 BFF、Java 配置平台等接口事项。
 
 ### 字段
 
@@ -64,7 +64,7 @@ MeuMall H5 需求排期
 | 接口需求 ID | 文本 | 是 | 稳定编号，例如 `API-PROMOTION-001`。 |
 | 关联页面 | 关联 | 是 | 关联 `H5 页面需求`。 |
 | 接口名称 | 文本 | 是 | 接口或数据能力名称。 |
-| 服务归属 | 单选 | 是 | `Java`、`Python`、`H5 BFF`、`server-meumall`、`admin-meumall`、`待定`。 |
+| 服务归属 | 单选 | 是 | `Java`、`H5 BFF`、`Java 配置平台`、`外部运行环境`、`待定`。 |
 | 接口类型 | 单选 | 是 | `查询`、`提交`、`配置`、`交易`、`上传`、`鉴权`、`待定`。 |
 | Method | 单选 | 否 | `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`待定`。 |
 | Path | 文本 | 否 | API path。 |

@@ -2,17 +2,20 @@
 
 ## 目标
 
-MeuMall AI 交付体系让 AI 可以长期参与正式业务开发，而不是只依赖单次聊天上下文。所有重要事实必须进入仓库文档、任务文件、契约或测试报告。
+MeuMall H5 AI 交付体系让 AI 可以长期参与 H5 C 端开发，而不是只依赖单次聊天上下文。所有重要事实必须进入仓库文档、任务文件、契约或测试报告。
 
 ## 适用范围
 
-本规则适用于：
+本规则当前适用于：
 
 - `hybird-meumall`
-- `server-meumall`
-- `app-meumall`
-- `admin-meumall`
-- `meumall-ci`
+
+以下历史目录或外部端不再属于当前工作区实现范围：
+
+- `server-meumall`：旧 Python manifest/config/release 服务，已被 Java H5 版本管理替代，并已从当前工作区移除。
+- `admin-meumall`：旧配置/发布后台，已外部化到 Java 管理系统，并已从当前工作区移除。
+- `app-meumall`：旧 SwiftUI WebView 壳，本仓库后续不再实现 iOS 需求，并已从当前工作区移除。
+- `meumall-ci`：旧本地 Jenkins 工作区，已从当前工作区移除；当前只维护根级 H5 发布脚本。
 
 ## 工作入口
 
@@ -29,7 +32,7 @@ AI 接手后必须先恢复上下文，再判断是否可以开发。
 1. 读取根级 AI 工作区文档。
 2. 读取当前任务文件。
 3. 读取涉及项目的 `AGENTS.md`。
-4. 读取涉及项目的 `.ai/PROJECT_STATE.md`、`.ai/AI_CONTEXT.md` 和 `.ai/TODO.md`。
+4. 读取 `hybird-meumall/.ai/PROJECT_STATE.md`、`.ai/AI_CONTEXT.md` 和 `.ai/TODO.md`。
 5. 判断任务状态是否为 `ready`。
 6. 判断是否存在跨项目契约变更。
 7. 制定实现计划。
@@ -42,8 +45,8 @@ AI 接手后必须先恢复上下文，再判断是否可以开发。
 
 - `idea`、`draft` 状态只允许澄清和设计，不允许实现。
 - `ready` 状态才允许进入实现。
-- 涉及两个以上项目时，必须明确责任边界。
-- 涉及接口、manifest、Native Bridge、发布 API 或数据结构时，必须先更新契约。
+- 需求默认只落在 `hybird-meumall`；不要主动修改旧 server/admin/app 目录。
+- 涉及 Java 接口、manifest、H5 发布 API 或数据结构时，必须先更新 H5 侧契约。
 - 涉及上线行为时，必须说明灰度、回滚、监控和验证方式。
 
 ## AI 行为要求
@@ -52,7 +55,7 @@ AI 接手后必须先恢复上下文，再判断是否可以开发。
 - 优先小步变更，每次变更有清晰范围。
 - 不覆盖用户已有修改。
 - 不把临时判断写成长期事实。
-- 不跨越项目职责边界顺手实现。
+- 不跨越 H5 职责边界顺手实现 Java、iOS 或管理后台职责。
 - 发现文档和实现不一致时，必须指出并在任务范围内修正。
 
 ## 完成定义

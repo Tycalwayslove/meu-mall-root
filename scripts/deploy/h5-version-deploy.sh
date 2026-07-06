@@ -13,6 +13,9 @@ SERVER_URL="${SERVER_URL:-https://${DOMAIN}}"
 DRY_RUN="${DRY_RUN:-false}"
 H5_RELEASE_ENV="${H5_RELEASE_ENV:-prod}"
 H5_RUNTIME_ENV_FILE="${H5_RUNTIME_ENV_FILE:-${H5_SOURCE_DIR}/config/env/h5.${H5_RELEASE_ENV}.env}"
+REGISTER_RESOLVER_PORT="${REGISTER_RESOLVER_PORT:-4110}"
+REGISTER_RESOLVER_CONTAINER="${REGISTER_RESOLVER_CONTAINER:-meu-mall-register-resolver}"
+INSTALL_REGISTER_RESOLVER="${INSTALL_REGISTER_RESOLVER:-true}"
 
 read_h5_env_value() {
   local key="$1"
@@ -29,9 +32,12 @@ read_h5_env_value() {
   )
 }
 
+PROFILE_JAVA_H5_RELEASE_API_BASE_URL="$(read_h5_env_value JAVA_H5_RELEASE_API_BASE_URL)"
+PROFILE_JAVA_H5_RELEASE_REGISTER_API_BASE_URL="$(read_h5_env_value JAVA_H5_RELEASE_REGISTER_API_BASE_URL)"
+
 JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-$(read_h5_env_value JAVA_API_BASE_URL)}"
-JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-}}}"
-JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}"
+JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${PROFILE_JAVA_H5_RELEASE_API_BASE_URL}}}}"
+JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${PROFILE_JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}}"
 JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN:-${JAVA_RELEASE_TOKEN:-}}"
 JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN:-${JAVA_RELEASE_REGISTER_TOKEN:-${JAVA_H5_RELEASE_TOKEN}}}"
 
@@ -70,7 +76,7 @@ if [ "${REGISTER_RELEASE:-true}" = "true" ]; then
   assert_java_h5_release_base_url "JAVA_H5_RELEASE_REGISTER_API_BASE_URL" "${JAVA_H5_RELEASE_REGISTER_API_BASE_URL}"
 fi
 
-PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}}"
+PUBLIC_H5_MANIFEST_URL="${PUBLIC_H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active}"
 SERVER_H5_MANIFEST_URL="${SERVER_H5_MANIFEST_URL:-${PUBLIC_H5_MANIFEST_URL}}"
 REQUIRE_EXISTING_TAG="${REQUIRE_EXISTING_TAG:-true}"
 PUSH_TAG_AFTER_RELEASE="${PUSH_TAG_AFTER_RELEASE:-false}"
@@ -138,7 +144,7 @@ resolve_git_commit() {
 }
 
 active_manifest_stable_version() {
-  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active?environment=${H5_RELEASE_ENV}"
+  local manifest_url="${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active"
   JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN}" python3 - "${manifest_url}" <<'PY'
 import json
 import os
@@ -298,6 +304,10 @@ safe_slug() {
   printf "%s" "$1" | tr -c 'A-Za-z0-9_.-' '-'
 }
 
+shell_quote() {
+  printf "%q" "$1"
+}
+
 H5_BASE_PATH="$(normalize_path "${H5_BASE_PATH}")"
 SAFE_VERSION="$(safe_slug "${H5_VERSION}")"
 if [ -z "${H5_CONTAINER}" ]; then
@@ -337,6 +347,7 @@ Feishu review:${SEND_FEISHU_REVIEW}
 Feishu dry:   ${FEISHU_REVIEW_DRY_RUN}
 Push tag:     ${PUSH_TAG_AFTER_RELEASE}
 Remote clean: ${CLEAN_OLD_REMOTE_RELEASES} keep=${REMOTE_KEEP_RELEASES}
+Resolver:     ${INSTALL_REGISTER_RESOLVER} ${REGISTER_RESOLVER_CONTAINER}:127.0.0.1:${REGISTER_RESOLVER_PORT}
 CDN asset:    ${NEXT_PUBLIC_H5_ASSET_BASE_URL:-none}
 H5 env file:  ${H5_RUNTIME_ENV_FILE}
 App env:      ${APP_ENV}
@@ -479,6 +490,7 @@ prepare_sync_bundle() {
   copy_file_if_exists ".dockerignore" ".dockerignore"
   copy_dir_if_exists "deploy/docker" "deploy/docker"
   copy_dir_if_exists "deploy/nginx" "deploy/nginx"
+  copy_dir_if_exists "scripts/register-resolver" "scripts/register-resolver"
 
   copy_h5_file_if_exists "package.json" "hybird-meumall/package.json"
   copy_h5_file_if_exists "pnpm-lock.yaml" "hybird-meumall/pnpm-lock.yaml"
@@ -629,6 +641,49 @@ echo "H5 version container is running on 127.0.0.1:\${selected_port}"
 REMOTE
 }
 
+remote_register_resolver_command() {
+  local q_container q_port q_api_base q_token q_volume
+  q_container="$(shell_quote "${REGISTER_RESOLVER_CONTAINER}")"
+  q_port="$(shell_quote "${REGISTER_RESOLVER_PORT}")"
+  q_api_base="$(shell_quote "${JAVA_H5_RELEASE_API_BASE_URL}")"
+  q_token="$(shell_quote "${JAVA_H5_RELEASE_TOKEN}")"
+  q_volume="$(shell_quote "${REMOTE_PATH}/scripts/register-resolver:/app:ro")"
+
+  cat <<REMOTE
+set -euo pipefail
+cd '${REMOTE_PATH}'
+if [ ! -f 'scripts/register-resolver/server.js' ]; then
+  echo 'Register resolver source is missing: scripts/register-resolver/server.js' >&2
+  exit 34
+fi
+
+docker rm -f ${q_container} >/dev/null 2>&1 || true
+docker run -d \
+  --name ${q_container} \
+  --restart unless-stopped \
+  --network host \
+  -e PORT=${q_port} \
+  -e REGISTER_ROUTE='/register' \
+  -e JAVA_H5_RELEASE_API_BASE_URL=${q_api_base} \
+  -e JAVA_H5_RELEASE_TOKEN=${q_token} \
+  -v ${q_volume} \
+  node:22-alpine \
+  node /app/server.js >/dev/null
+
+for attempt in \$(seq 1 15); do
+  if curl -fsS --max-time 5 "http://127.0.0.1:${REGISTER_RESOLVER_PORT}/health" >/dev/null; then
+    echo 'register resolver health passed'
+    exit 0
+  fi
+  sleep 2
+done
+
+docker logs ${q_container} >&2 || true
+echo 'Register resolver health check failed.' >&2
+exit 35
+REMOTE
+}
+
 remote_nginx_command() {
   cat <<REMOTE
 set -euo pipefail
@@ -655,6 +710,7 @@ write_snippet() {
 if command -v nginx >/dev/null 2>&1; then
   mkdir -p /etc/nginx/conf.d/meu-mall-h5-versions
   cp '${REMOTE_PATH}/deploy/nginx/hybird.aigcpop.com.conf' '/etc/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
+  sed -i "s/127.0.0.1:4110/127.0.0.1:${REGISTER_RESOLVER_PORT}/g" '/etc/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
   write_snippet /etc/nginx/conf.d/meu-mall-h5-versions
   nginx -t
   nginx -s reload || systemctl reload nginx || service nginx reload
@@ -665,6 +721,7 @@ fi
 if docker ps --format '{{.Names}}' | grep -qx 'mall4j-nginx' && [ -d '/opt/mail4j/nginx/conf.d' ]; then
   mkdir -p /opt/mail4j/nginx/conf.d/meu-mall-h5-versions
   cp '${REMOTE_PATH}/deploy/nginx/hybird.aigcpop.com.ssl.conf' '/opt/mail4j/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
+  sed -i "s/127.0.0.1:4110/127.0.0.1:${REGISTER_RESOLVER_PORT}/g" '/opt/mail4j/nginx/conf.d/meu-mall-hybird.aigcpop.com.conf'
   write_snippet /opt/mail4j/nginx/conf.d/meu-mall-h5-versions
   docker exec mall4j-nginx nginx -t
   docker exec mall4j-nginx nginx -s reload
@@ -936,6 +993,13 @@ fi
 
 echo "== Build and start H5 version container =="
 run_ssh "$(remote_deploy_command)"
+
+if [ "${INSTALL_REGISTER_RESOLVER}" = "true" ]; then
+  echo "== Start register resolver =="
+  run_ssh "$(remote_register_resolver_command)"
+else
+  echo "== Skip register resolver =="
+fi
 
 if [ "${INSTALL_NGINX}" = "true" ]; then
   echo "== Install version Nginx location =="

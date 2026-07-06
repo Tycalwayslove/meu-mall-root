@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | 00 MeuMall 项目总览与协作入口 | <https://v05ctaei9gn.feishu.cn/wiki/IGtzwfR1yi3F9Zkim4Ocno1gnAd> | `.ai-workspace/PROJECT_MAP.md`、`.ai-workspace/product/product-decisions.md`、`.ai-workspace/product/page-inventory.md` |
 | 00 知识库使用说明与同步规则 | <https://v05ctaei9gn.feishu.cn/wiki/GRzDwu5CwiH3vEkb51Dc41atnzf> | `.ai-workspace/H5_FEISHU_KNOWLEDGE_SYNC_WORKFLOW.md` |
-| 01 H5 与原生 App 路由跳转对接说明 | <https://v05ctaei9gn.feishu.cn/wiki/OJk1wa43PiR9lTkYs2YcW8llnmf> | `.ai-workspace/integration-briefs/BRIEF-2026-0605-h5-native-route-map.md` |
+| 01 H5 与外部运行环境路由跳转对接说明 | <https://v05ctaei9gn.feishu.cn/wiki/OJk1wa43PiR9lTkYs2YcW8llnmf> | `.ai-workspace/integration-briefs/BRIEF-2026-0605-h5-native-route-map.md` |
 | 02 H5 页面清单与开发进度 | <https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre> | `.ai-workspace/product/page-inventory.md`、`hybird-meumall/src/app` |
 | 03 H5 BFF、鉴权与后端接口对接说明 | <https://v05ctaei9gn.feishu.cn/wiki/GPhdwjQ87iQAQskeS6lc9bMOnte> | `.ai-workspace/contracts/api/h5-bff-http-auth-contract.md`、`.ai-workspace/contracts/api/promotion-bff-mock-contract.md` |
 | 04 H5 发版、版本切换与回滚流程 | <https://v05ctaei9gn.feishu.cn/wiki/HyBpwTbNUigKsOkO2Qgc2rjBnie> | `.ai-workspace/H5_RELEASE_RUNBOOK.md`、`.ai-workspace/H5_FEISHU_RELEASE_NOTIFICATION_WORKFLOW.md` |
@@ -41,11 +41,11 @@
 
 只要 H5 需求涉及以下任一内容，建议同步飞书知识库：
 
-- H5 与原生 App 的页面、路由、WebView、Bridge、登录态、支付、分享或返回规则。
-- H5 与后端的接口、鉴权、BFF、错误码、缓存和联调规则。
-- H5 与管理后台的配置项、素材、上下线、灰度和回滚规则。
+- H5 与外部运行环境的页面、路由、WebView、Bridge、登录态、支付、分享或返回规则。
+- H5 与 Java/API 的接口、鉴权、BFF、错误码、缓存和联调规则。
+- H5 与 Java 配置平台的配置项、素材、上下线、灰度和回滚规则。
 - H5 发布、Jenkins、manifest、active 切换、回滚和线上验证流程。
-- 需要给后端、原生 App、测试、产品或管理后台同事统一说明的流程。
+- 需要给 Java/API、外部运行环境、测试、产品或 Java 配置平台同事统一说明的流程。
 
 ## 推荐知识库结构
 
@@ -55,19 +55,19 @@ MeuMall 项目协作知识库
 │   ├── 项目介绍与端归属
 │   ├── 当前业务边界
 │   └── 常用环境与域名
-├── 01 H5 与原生 App 对接
+├── 01 H5 与外部运行环境对接
 │   ├── H5 页面清单与开发进度
 │   ├── H5 路由跳转总图
 │   ├── WebView 容器策略说明
 │   ├── A -> B 跳转交互明细
 │   ├── Native Bridge 能力清单
 │   └── 返回、关闭、切 Tab 规则
-├── 02 H5 与后端接口对接
+├── 02 H5 与 Java/API 接口对接
 │   ├── 鉴权与 token 传递规则
 │   ├── BFF 中间层说明
-│   ├── Java/Python 服务调用规则
+│   ├── Java 服务调用规则
 │   └── 接口契约清单
-├── 03 管理后台与配置
+├── 03 Java 配置平台与配置
 │   ├── 首页配置项说明
 │   ├── 活动配置项说明
 │   ├── H5 版本配置说明
@@ -118,9 +118,9 @@ MeuMall 项目协作知识库
 | 产品决策 | `.ai-workspace/product/product-decisions.md`、`.ai-workspace/domain/meumall-business-model.md` |
 | H5 页面开发流程 | `.ai-workspace/H5_PAGE_DEVELOPMENT_WORKFLOW.md`、H5 页面级开发规范 |
 | 跨端对接流程 | `.ai-workspace/H5_DEMAND_INTEGRATION_WORKFLOW.md`、`integration-briefs/` |
-| Native Bridge | `.ai-workspace/contracts/native-bridge/`、`hybird-meumall/docs/02_NATIVE_BRIDGE_SPEC.md` |
+| 外部运行环境/Bridge | `.ai-workspace/contracts/native-bridge/`、`hybird-meumall/docs/02_NATIVE_BRIDGE_SPEC.md` |
 | API/BFF | `.ai-workspace/contracts/api/`、`hybird-meumall/docs/05_API_SPEC.md` |
-| 发布回滚 | `.ai-workspace/RELEASE_GOVERNANCE.md`、`hybird-meumall/docs/03_RELEASE_SPEC.md`、`meumall-ci` 文档 |
+| 发布回滚 | `.ai-workspace/RELEASE_GOVERNANCE.md`、`hybird-meumall/docs/03_RELEASE_SPEC.md`、根目录 H5 发布脚本 |
 | 架构决策 | 子项目 `docs/09_DECISIONS.md`、根级任务/对接说明 |
 
 ## 同步流程
@@ -147,7 +147,7 @@ AI 必须先读取：
 相关契约、任务、对接说明和子项目文档
 ```
 
-如果同步 H5 与原生 App 对接文档，还必须读取：
+如果同步 H5 与外部运行环境对接文档，还必须读取：
 
 ```text
 .ai-workspace/product/page-inventory.md
@@ -156,7 +156,6 @@ AI 必须先读取：
 .ai-workspace/contracts/h5-native-route-contract.md
 .ai-workspace/contracts/native-bridge/
 hybird-meumall/docs/02_NATIVE_BRIDGE_SPEC.md
-app-meumall/docs/03_WEBVIEW_RUNTIME.md
 ```
 
 ### 3. 生成仓库版 Markdown
@@ -206,14 +205,14 @@ app-meumall/docs/03_WEBVIEW_RUNTIME.md
 
 ## AI 同步指令模板
 
-### 创建或更新 H5 原生路由对接文档
+### 创建或更新 H5 外部运行环境路由对接文档
 
 ```text
 请按 H5 飞书知识库同步工作流，
-基于当前仓库事实源生成/更新「H5 与原生 App 路由跳转对接说明」。
+基于当前仓库事实源生成/更新「H5 与外部运行环境路由跳转对接说明」。
 
 要求：
-1. 先读取页面清单、产品决策、Native Bridge 契约和 H5 实际路由。
+1. 先读取页面清单、产品决策、Bridge 契约和 H5 实际路由。
 2. 输出仓库版 Markdown。
 3. 生成飞书版结构。
 4. 标记已确认、待确认和代码待修正内容。
@@ -266,7 +265,7 @@ app-meumall/docs/03_WEBVIEW_RUNTIME.md
 | 优先级 | 文档 | 目标 |
 | --- | --- | --- |
 | P0 | H5 页面清单与开发进度 | 让各方知道 H5/App 各自有哪些页面 |
-| P0 | H5 与原生 App 路由跳转对接说明 | 统一路由、WebView、返回、切 Tab 规则 |
+| P0 | H5 与外部运行环境路由跳转对接说明 | 统一路由、WebView、返回、切 Tab 规则 |
 | P0 | WebView 容器策略与返回规则 | 解释为什么新开 WebView、何时关闭和切 Tab |
 | P1 | Native Bridge 能力清单 | 统一 Bridge 方法、参数、fallback |
 | P1 | H5 版本发布、切 active 与回滚流程 | 统一 Jenkins、manifest、线上验证口径 |

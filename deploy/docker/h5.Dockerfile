@@ -24,8 +24,8 @@ ARG PYTHON_API_BASE_URL=
 ARG H5_BFF_LOG_BACKEND_RESPONSE=0
 ARG H5_BFF_BACKEND_RESPONSE_LOG_LIMIT=30000
 ARG NEXT_PUBLIC_CONFIG_API_BASE_URL=/
-ARG NEXT_PUBLIC_H5_MANIFEST_URL=/api/h5/manifest/active?environment=prod
-ARG H5_MANIFEST_URL=https://hybird.aigcpop.com/api/h5/manifest/active?environment=prod
+ARG NEXT_PUBLIC_H5_MANIFEST_URL=https://test.aigcpop.com:18088/apis/platform/h5Release/active
+ARG H5_MANIFEST_URL=https://test.aigcpop.com:18088/apis/platform/h5Release/active
 
 ENV H5_BASE_PATH=${H5_BASE_PATH} \
     H5_ASSET_PREFIX=${H5_ASSET_PREFIX} \

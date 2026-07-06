@@ -18,13 +18,14 @@ https://hybird.aigcpop.com/h5-v/v1.0.28/register
 
 ## 入口解析规则
 
-`server-meumall` 提供 `GET /register`：
+独立 Node resolver 提供 `GET /register`：
 
-1. 按当前域名对应的部署实例读取 active manifest。
-2. 确认 active manifest 中声明了 `/register` route。
-3. 按 `assets.serviceBaseUrl + assets.basePath + routes["/register"].path` 拼出当前 H5 版本注册页。
-4. 返回 302 跳转。
-5. 保留运营 query 参数；测试和正式环境通过域名区分，不在 URL 中拼接 `environment`。
+1. 按当前 H5 环境配置读取 `JAVA_H5_RELEASE_API_BASE_URL`。
+2. 调用 Java `GET /platform/h5Release/active`，不拼接 `environment` query。
+3. 确认 active manifest 中声明了 `/register` route。
+4. 按 `assets.serviceBaseUrl + assets.basePath + routes["/register"].path` 拼出当前 H5 版本注册页。
+5. 返回 302 跳转。
+6. 保留运营 query 参数；测试和正式环境通过域名区分，不在 URL 中拼接 `environment`。
 
 示例：
 
@@ -38,8 +39,10 @@ GET https://hybird.aigcpop.com/register?utm=qr
 | 角色 | 责任 |
 | --- | --- |
 | 运营 | 二维码只投放固定入口 `/register` |
-| 运维/nginx | 将公网 `/register` 转发到 `server-meumall` |
-| server-meumall | 查询 active manifest 并 302 到当前注册页 |
+| Jenkins/CI | 部署并启动 `meu-mall-register-resolver` Node 容器 |
+| 运维/nginx | 将公网 `/register` 转发到 Node resolver |
+| Node resolver | 查询 Java active manifest 并 302 到当前注册页 |
+| Java H5 版本管理 | 提供不带 `environment` query 的 active manifest 接口 |
 | hybird-meumall | 确保 H5 版本内存在 `/register` 页面，发版 manifest 包含该 route |
 | 发布负责人 | 先激活包含 `/register` 的版本，再对外投放二维码 |
 
@@ -64,3 +67,4 @@ GET https://hybird.aigcpop.com/register?utm=qr
 - 创建 revision：3
 - 同步记录回写后 revision：4
 - 2026-07-06 二次更新：移除 `/register` 的 `environment` query 口径，最新 revision：6
+- 2026-07-06 三次更新：实现改为独立 Node resolver 容器；规则页同步至 revision 11，页面盘点同步至 revision 73，H5 发版流程同步至 revision 7。

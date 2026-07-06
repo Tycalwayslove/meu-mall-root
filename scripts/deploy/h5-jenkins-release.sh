@@ -2,20 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CI_HOME="${CI_HOME:-${ROOT_DIR}/meumall-ci}"
-CONFIG_FILE="${H5_TEST_RELEASE_CONFIG:-${CI_HOME}/config/h5-test-release.env}"
+CONFIG_FILE="${H5_TEST_RELEASE_CONFIG:-}"
 
-if [ ! -f "${CONFIG_FILE}" ]; then
+if [ -n "${CONFIG_FILE}" ] && [ ! -f "${CONFIG_FILE}" ]; then
   echo "缺少 H5 测试发版配置：${CONFIG_FILE}" >&2
   exit 2
 fi
 
-set -a
-# shellcheck disable=SC1090
-. "${CONFIG_FILE}"
-set +a
+if [ -n "${CONFIG_FILE}" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "${CONFIG_FILE}"
+  set +a
+fi
 
-WORKSPACE_DIR="${H5_RELEASE_WORKSPACE_DIR:-${CI_HOME}/workspaces/h5-release}"
+WORKSPACE_DIR="${H5_RELEASE_WORKSPACE_DIR:-${ROOT_DIR}/.workspaces/h5-release}"
 H5_GIT_URL="${H5_GIT_URL:-git@github.com:Tycalwayslove/hybird-meumall.git}"
 H5_GIT_BRANCH="${H5_GIT_BRANCH:-main}"
 H5_RELEASE_ENV="${H5_RELEASE_ENV:-test}"
@@ -63,8 +64,11 @@ set -a
 . "${H5_RUNTIME_ENV_FILE}"
 set +a
 
-JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-}}}"
-JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}"
+PROFILE_JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-}"
+PROFILE_JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-}"
+
+JAVA_H5_RELEASE_API_BASE_URL="${JAVA_H5_RELEASE_API_BASE_URL:-${JAVA_RELEASE_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${PROFILE_JAVA_H5_RELEASE_API_BASE_URL}}}}"
+JAVA_H5_RELEASE_REGISTER_API_BASE_URL="${JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_RELEASE_REGISTER_SERVER_URL:-${JAVA_H5_RELEASE_ADMIN_API_BASE_URL:-${PROFILE_JAVA_H5_RELEASE_REGISTER_API_BASE_URL:-${JAVA_H5_RELEASE_API_BASE_URL:-}}}}}"
 JAVA_H5_RELEASE_TOKEN="${JAVA_H5_RELEASE_TOKEN:-${JAVA_RELEASE_TOKEN:-}}"
 JAVA_H5_RELEASE_REGISTER_TOKEN="${JAVA_H5_RELEASE_REGISTER_TOKEN:-${JAVA_RELEASE_REGISTER_TOKEN:-${JAVA_H5_RELEASE_TOKEN}}}"
 
@@ -82,7 +86,7 @@ assert_java_h5_release_base_url() {
       {
         echo "${name} 指向了旧 Python manifest/release 或 Java 业务接口，不允许用于 H5 版本管理。"
         echo "${name}: ${value}"
-        echo "请在 ${CONFIG_FILE} 中配置 Java 管理系统前缀，例如：https://test.aigcpop.com:18088/apis"
+        echo "请通过 Jenkins 环境变量或 H5_TEST_RELEASE_CONFIG 指向的配置文件配置 Java 管理系统前缀，例如：https://test.aigcpop.com:18088/apis"
       } >&2
       exit 2
       ;;
@@ -102,9 +106,9 @@ fi
 if [ "${#missing_config[@]}" -gt 0 ]; then
   {
     echo "H5 测试发版配置不完整：${missing_config[*]}"
-    echo "固定配置文件：${CONFIG_FILE}"
+    echo "配置文件：${CONFIG_FILE:-未设置；当前仅使用环境变量}"
     echo "H5 环境配置：${H5_RUNTIME_ENV_FILE}"
-    echo "Jenkins 页面只保留分支选择，测试环境地址、服务器凭据等固定配置从文件读取。"
+    echo "请在外部 Jenkins 环境变量中配置测试环境地址、服务器凭据和 Java H5 版本管理地址，或用 H5_TEST_RELEASE_CONFIG 指向显式配置文件。"
   } >&2
   exit 2
 fi

@@ -25,45 +25,20 @@ for local_env_file in "${ROOT_DIR}/.env.local" "${ROOT_DIR}/hybird-meumall/.env.
   fi
 done
 
-SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
-SERVER_PORT="${SERVER_PORT:-4100}"
 H5_HOST="${H5_HOST:-localhost}"
 H5_PORT="${H5_PORT:-${PORT:-3109}}"
-ADMIN_HOST="${ADMIN_HOST:-localhost}"
-ADMIN_PORT="${ADMIN_PORT:-5173}"
 H5_BASE_PATH="${H5_BASE_PATH:-/hybird}"
-ENVIRONMENT="${ENVIRONMENT:-prod}"
-
-SERVER_URL="$(service_url "${SERVER_HOST}" "${SERVER_PORT}" "/api/health")"
 H5_URL="$(service_url "${H5_HOST}" "${H5_PORT}" "${H5_BASE_PATH}")"
-ADMIN_URL="$(service_url "${ADMIN_HOST}" "${ADMIN_PORT}" "/")"
-MANIFEST_URL="${H5_MANIFEST_URL:-http://${SERVER_HOST}:${SERVER_PORT}/api/h5/manifest/active?environment=${ENVIRONMENT}}"
-CONFIG_API_BASE_URL="${NEXT_PUBLIC_CONFIG_API_BASE_URL:-${H5_RELEASE_SERVER_URL:-http://${SERVER_HOST}:${SERVER_PORT}}}"
+MANIFEST_URL="${H5_MANIFEST_URL:-${JAVA_H5_RELEASE_API_BASE_URL:+${JAVA_H5_RELEASE_API_BASE_URL%/}/platform/h5Release/active}}"
 
-STARTED_PIDS=()
-STARTED_NAMES=()
+STARTED_PID=""
 
 cleanup() {
   local status=$?
-  local pid
-  local attempt
-
-  for pid in "${STARTED_PIDS[@]:-}"; do
-    kill "${pid}" 2>/dev/null || true
-  done
-
-  for pid in "${STARTED_PIDS[@]:-}"; do
-    attempt=0
-    while kill -0 "${pid}" 2>/dev/null && [ "${attempt}" -lt 10 ]; do
-      sleep 0.2
-      attempt=$((attempt + 1))
-    done
-    if kill -0 "${pid}" 2>/dev/null; then
-      kill -KILL "${pid}" 2>/dev/null || true
-    fi
-  done
-
-  wait 2>/dev/null || true
+  if [ -n "${STARTED_PID}" ]; then
+    kill "${STARTED_PID}" 2>/dev/null || true
+    wait "${STARTED_PID}" 2>/dev/null || true
+  fi
   exit "${status}"
 }
 trap cleanup INT TERM EXIT
@@ -76,37 +51,6 @@ print_blocked_port() {
   echo "Cannot start ${name}: port ${port} is already in use, but ${health_url} is not responding as expected." >&2
   echo "Port owner:" >&2
   port_owner "${port}" >&2
-}
-
-remember_started() {
-  local name="$1"
-  local pid="$2"
-
-  STARTED_NAMES+=("${name}")
-  STARTED_PIDS+=("${pid}")
-}
-
-start_server() {
-  local decision
-  decision="$(service_start_decision "server-meumall" "${SERVER_PORT}" "${SERVER_URL}")"
-
-  if [ "${decision}" = "reuse" ]; then
-    echo "Reusing server-meumall on ${SERVER_URL}"
-    return 0
-  fi
-
-  if [ "${decision}" = "blocked" ]; then
-    print_blocked_port "server-meumall" "${SERVER_PORT}" "${SERVER_URL}"
-    return 1
-  fi
-
-  echo "Starting server-meumall on ${SERVER_URL}"
-  (
-    cd "${ROOT_DIR}/server-meumall"
-    . .venv/bin/activate
-    exec python3 -m uvicorn app.main:app --host "${SERVER_HOST}" --port "${SERVER_PORT}" --reload
-  ) &
-  remember_started "server-meumall" "$!"
 }
 
 start_h5() {
@@ -179,84 +123,35 @@ start_h5() {
       H5_BASE_PATH="${H5_BASE_PATH}" \
       NEXT_PUBLIC_H5_BASE_PATH="${NEXT_PUBLIC_H5_BASE_PATH:-${H5_BASE_PATH}}" \
       H5_SERVICE_BASE_URL="${H5_SERVICE_BASE_URL:-}" \
-      H5_RELEASE_SERVER_URL="${H5_RELEASE_SERVER_URL:-${CONFIG_API_BASE_URL}}" \
-      H5_MANIFEST_URL="${MANIFEST_URL}" \
-      NEXT_PUBLIC_H5_MANIFEST_URL="${NEXT_PUBLIC_H5_MANIFEST_URL:-${MANIFEST_URL}}" \
-      NEXT_PUBLIC_CONFIG_API_BASE_URL="${CONFIG_API_BASE_URL}" \
+      H5_RELEASE_SERVER_URL="${H5_RELEASE_SERVER_URL:-}" \
+      H5_MANIFEST_URL="${MANIFEST_URL:-}" \
+      NEXT_PUBLIC_H5_MANIFEST_URL="${NEXT_PUBLIC_H5_MANIFEST_URL:-${MANIFEST_URL:-}}" \
+      NEXT_PUBLIC_CONFIG_API_BASE_URL="${NEXT_PUBLIC_CONFIG_API_BASE_URL:-}" \
       NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-/api/bff}" \
       H5_HEALTH_CHECK_PATH="${H5_HEALTH_CHECK_PATH:-/api/health}" \
       H5_RELEASE_VARIANT="${H5_RELEASE_VARIANT:-}" \
       H5_RELEASE_LABEL="${H5_RELEASE_LABEL:-}" \
       JAVA_API_BASE_URL="${JAVA_API_BASE_URL:-}" \
+      JAVA_OSS_ASSET_BASE_URL="${JAVA_OSS_ASSET_BASE_URL:-}" \
       PYTHON_API_BASE_URL="${PYTHON_API_BASE_URL:-}" \
       pnpm exec next dev --webpack -H "${H5_HOST}" -p "${H5_PORT}"
   ) &
-  remember_started "hybird-meumall" "$!"
+  STARTED_PID="$!"
 }
 
-start_admin() {
-  local decision
-  decision="$(service_start_decision "admin-meumall" "${ADMIN_PORT}" "${ADMIN_URL}")"
-
-  if [ "${decision}" = "reuse" ]; then
-    echo "Reusing admin-meumall on ${ADMIN_URL}"
-    return 0
-  fi
-
-  if [ "${decision}" = "blocked" ]; then
-    print_blocked_port "admin-meumall" "${ADMIN_PORT}" "${ADMIN_URL}"
-    return 1
-  fi
-
-  echo "Starting admin-meumall on ${ADMIN_URL}"
-  (
-    cd "${ROOT_DIR}/admin-meumall"
-    exec env \
-      VITE_CONFIG_API_BASE_URL="${CONFIG_API_BASE_URL}" \
-      pnpm dev -- --host "${ADMIN_HOST}" --port "${ADMIN_PORT}"
-  ) &
-  remember_started "admin-meumall" "$!"
-}
-
-monitor_started_services() {
-  local pid
-  local index
-  local status
-
-  if [ "${#STARTED_PIDS[@]}" -eq 0 ]; then
-    echo "All services were already running. Nothing new was started."
-    return 0
-  fi
-
-  echo
-  echo "Press Ctrl+C to stop services started by this command."
-
-  while true; do
-    index=0
-    for pid in "${STARTED_PIDS[@]}"; do
-      if ! kill -0 "${pid}" 2>/dev/null; then
-        status=0
-        wait "${pid}" || status=$?
-        echo "${STARTED_NAMES[${index}]} exited with status ${status}." >&2
-        return "${status}"
-      fi
-      index=$((index + 1))
-    done
-    sleep 1
-  done
-}
-
-start_server
 start_h5
-start_admin
 
 echo
-echo "Local services:"
-echo "- server: ${SERVER_URL}"
-echo "- h5:     ${H5_URL}"
-echo "- admin:  ${ADMIN_URL}"
-echo "- h5 env: ${H5_ENV} (${H5_ENV_FILE})"
-echo "- java:   ${JAVA_API_BASE_URL:-not configured}"
-echo "- python: ${PYTHON_API_BASE_URL:-not configured}"
+echo "Local H5 service:"
+echo "- h5:       ${H5_URL}"
+echo "- h5 env:   ${H5_ENV} (${H5_ENV_FILE})"
+echo "- java:     ${JAVA_API_BASE_URL:-not configured}"
+echo "- manifest: ${MANIFEST_URL:-not configured}"
+echo
+if [ -n "${STARTED_PID}" ]; then
+  echo "Press Ctrl+C to stop the H5 service started by this command."
 
-monitor_started_services
+  wait "${STARTED_PID}"
+else
+  echo "No new H5 service was started by this command."
+fi

@@ -14,13 +14,13 @@
 6. `.ai-workspace/ACCEPTANCE_STANDARD.md`
 7. `.ai-workspace/MEMORY_PROTOCOL.md`
 
-如果任务涉及接口、Native Bridge、manifest、release 或 CI，还必须读取：
+如果任务涉及接口、manifest、release 或 CI，还必须读取：
 
 1. `.ai-workspace/CROSS_PROJECT_CONTRACTS.md`
 2. `.ai-workspace/RELEASE_GOVERNANCE.md`
-3. 相关子项目的 `AGENTS.md`
+3. `hybird-meumall/AGENTS.md`
 
-如果任务涉及 H5 需求开发、跨端对接、后端接口申请、原生 App 能力、管理后台配置或联调，还必须读取：
+如果任务涉及 H5 需求开发、Java 接口联调、H5 发布或线上验证，还必须读取：
 
 1. `.ai-workspace/H5_DEMAND_INTEGRATION_WORKFLOW.md`
 2. `.ai-workspace/templates/INTEGRATION_BRIEF.md`
@@ -40,23 +40,22 @@
 ## 工作区原则
 
 - 根目录负责统一 AI 工作机制，不承载具体业务实现。
-- 子项目负责各自代码、项目状态、测试报告和项目内决策。
-- 跨项目任务必须有工作项。
-- 跨项目接口必须有契约。
-- 跨端 H5 需求必须有对接说明。
+- 当前仓库只维护 `hybird-meumall` H5 C 端；后续需求、修改和验证默认只考虑 H5。
+- 旧 `server-meumall`、`admin-meumall`、`app-meumall` 已退役/外部化，并已从当前工作区物理移除；不要为了 H5 需求恢复这些目录。
+- Java 后端、Java 管理台和 iOS App 都是外部系统；本仓库只记录 H5 侧消费契约、环境配置和联调结论。
+- H5 调用 Java 接口必须有契约或明确记录联调口径。
 - 页面进度、页面清单、端归属、H5 路由或页面状态发生变更时，必须先更新仓库事实源，再同步到公司飞书知识库对应页面。
-- Native Bridge、WebView 容器策略、路由跳转、登录态、支付、分享、返回/关闭/切 Tab 等跨端协议发生变更时，必须同步根级契约和对接说明，并同步到公司飞书知识库对应页面；不得只改代码或本地文档。
+- 涉及外部 App/WebView/Bridge 的内容，仅记录 H5 侧调用假设和 fallback；不得把 iOS 实现作为本仓库交付项。
 - 飞书知识库同步默认遵循 `.ai-workspace/H5_FEISHU_KNOWLEDGE_SYNC_WORKFLOW.md`，公司知识库默认目标为 `新款app开发资料 / 前端知识库`；同步完成后必须记录飞书链接、revision 或验证结果。
 - 没有 `ready` 状态，不开始正式实现。
 - 没有验证记录，不声称完成。
 
-## 子项目
+## 当前项目边界
 
-- `hybird-meumall`：H5 商城前台。
-- `server-meumall`：manifest、config 和 release 服务。
-- `app-meumall`：SwiftUI WebView 原生壳。
-- `admin-meumall`：配置和发版管理台。
-- `meumall-ci`：本地 CI、部署和 release 注册脚手架。
+- `hybird-meumall`：唯一当前维护项目，承载 H5 商城 C 端页面、BFF、H5 发布和 H5 侧 AI 状态。
+- 根级 `.ai-workspace`、`scripts/deploy`、`deploy/nginx`：只服务 H5 工作流、H5 发布和 H5 文档同步。
+- Java：外部系统，提供 H5 版本管理、active manifest、release 注册/切 active、业务 API 和管理后台能力。
+- `server-meumall` / `admin-meumall` / `app-meumall` / `meumall-ci`：已从当前工作区移除，不再作为后续需求实现范围。
 
 ## 语言
 

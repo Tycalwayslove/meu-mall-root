@@ -53,7 +53,7 @@ H5 飞书通报分为两类，不能混在一条消息里讲。
 | 待审核 H5 版本号 | Jenkins 发版参数 `--version vX.Y.Z`，或 Java H5 版本管理列表中的目标 release；Jenkins 迁移后禁止再用 `hybird-meumall/package.json` 直接当作待审核版本 |
 | 待审核 Git tag | Jenkins 发版参数 `--git-tag h5/vX.Y.Z`，或 Java H5 版本管理 `buildMeta.gitTag` |
 | 待审核 Git commit | Java H5 版本管理目标 release 的 `buildMeta.gitCommit`；缺失时再用 `h5/vX.Y.Z` tag 反查 |
-| 当前线上 active 版本 | Java H5 版本管理 active 接口：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active?environment={env}` |
+| 当前线上 active 版本 | Java H5 版本管理 active 接口：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active` |
 | 当前线上 active commit | Java H5 版本管理 list 接口中 `status=active` 且 `version=active.stableVersion` 的 `buildMeta.gitCommit`；active 接口只有 manifest 时必须再查 list 或用 `h5/{stableVersion}` tag 反查 |
 | 版本 diff 范围 | `git log --oneline <activeCommit>..<targetCommit>` 和 `git diff --shortstat <activeCommit>..<targetCommit>` |
 | 变更摘要 | `hybird-meumall/.ai/CHANGE_SUMMARY.md` |
@@ -69,9 +69,9 @@ H5 飞书通报分为两类，不能混在一条消息里讲。
 
 Jenkins/Java 测试发版的标准取数顺序：
 
-1. 读取当前环境配置，例如 `meumall-ci/config/h5-test-release.env` 中的 `H5_RELEASE_ENV`、`JAVA_H5_RELEASE_API_BASE_URL`、`JAVA_H5_RELEASE_REGISTER_API_BASE_URL`。
-2. 查询 Java active：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active?environment={H5_RELEASE_ENV}`，得到当前 active 的 `stableVersion`、`rollbackVersion`、`assets.basePath`。
-3. 查询 Java list：`GET {JAVA_H5_RELEASE_REGISTER_API_BASE_URL}/platform/h5Release/list?environment={H5_RELEASE_ENV}`，找到：
+1. 读取当前外部 Jenkins 环境变量或 `H5_TEST_RELEASE_CONFIG` 指向的显式配置文件，例如 `H5_RELEASE_ENV`、`JAVA_H5_RELEASE_API_BASE_URL`、`JAVA_H5_RELEASE_REGISTER_API_BASE_URL`。
+2. 查询 Java active：`GET {JAVA_H5_RELEASE_API_BASE_URL}/platform/h5Release/active`，得到当前 active 的 `stableVersion`、`rollbackVersion`、`assets.basePath`。
+3. 查询 Java list：`GET {JAVA_H5_RELEASE_REGISTER_API_BASE_URL}/platform/h5Release/list`，找到：
    - `status=active` 且 `version=active.stableVersion` 的线上版本记录，读取 `buildMeta.gitCommit` 作为 `activeCommit`。
    - 本次待审核版本记录，读取 `buildMeta.gitCommit`、`buildMeta.gitTag`、`buildMeta.jenkinsBuildNumber`、`status` 作为 `targetCommit` 和发版元信息。
 4. 如果 Java active 的 `data` 是 JSON 字符串，必须二次解析；如果 active 接口只有 manifest 不含 `buildMeta`，必须用 Java list 或 `h5/<stableVersion>` tag 反查 commit。
@@ -189,8 +189,8 @@ pnpm run feishu:h5-release-approve
 - 到今天为止已经完成的 H5 工程架构和运行机制。
 - 到今天为止已经完成或推进中的页面和业务能力。
 - 跨端、发布、manifest、Jenkins、Nginx 等协作能力。
-- 原生 App、后端/管理台、测试分别受到什么影响。
-- 原生 App、后端/管理台、测试还需要补什么。
+- 外部运行环境、Java/API 或配置平台、测试分别受到什么影响。
+- 外部运行环境、Java/API 或配置平台、测试还需要补什么。
 - 后续通知规则：以后每个版本只发增量变化。
 
 审核说明必须明确提示审核人回复：

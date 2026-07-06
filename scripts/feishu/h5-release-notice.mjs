@@ -734,10 +734,10 @@ function renderOverviewMessage({ context, config, title, includeApprovalGuide, a
     "",
     "## 这些变化对大家意味着什么",
     "",
-    "**原生 App**",
+    "**外部运行环境**",
     ...toBullets(overview.nativeImpact),
     "",
-    "**后端 / 管理台**",
+    "**Java/API / 配置平台**",
     ...toBullets(overview.backendImpact),
     "",
     "**测试**",
@@ -745,10 +745,10 @@ function renderOverviewMessage({ context, config, title, includeApprovalGuide, a
     "",
     "## 现在还缺什么，需要大家配合什么",
     "",
-    "**原生 App 需要配合**",
+    "**外部运行环境需要配合**",
     ...toBullets(overview.nativeNeeded),
     "",
-    "**后端 / 管理台需要配合**",
+    "**Java/API / 配置平台需要配合**",
     ...toBullets(overview.backendNeeded),
     "",
     "**测试需要配合**",
@@ -822,7 +822,7 @@ function renderMessage({ context, config, title, includeApprovalGuide, approvedB
     "",
     "## 需要大家配合什么",
     "",
-    "**原生 App**",
+    "**外部运行环境**",
     "",
     "已对接：",
     ...toBullets(notice.nativeDone),
@@ -830,7 +830,7 @@ function renderMessage({ context, config, title, includeApprovalGuide, approvedB
     "还需要你们确认/提供：",
     ...toBullets(notice.nativeNeeded),
     "",
-    "**后端 / 管理台**",
+    "**Java/API / 配置平台**",
     "",
     "已对接：",
     ...toBullets(notice.backendDone),
@@ -879,62 +879,62 @@ function buildProjectOverview(context, config) {
       "H5 基础架构、版本发布体系、跨端跳转协议和推广相关页面已进入线上联调准备阶段",
     deliverySystem: override.deliverySystem?.length ? override.deliverySystem : [
       "根目录已经建立统一 AI 工作机制：工作项结构、状态流转、验收标准、上下文记忆、契约治理和发布治理都有仓库内事实源。",
-      "H5 需求开发已经形成固定流程：先确定页面范围、渲染模式、BFF mock、接口契约、原生对接和测试口径，再进入页面实现。",
-      "飞书知识库和飞书多维表格已经纳入协作流：对接文档、路由说明、排期、接口需求、原生事项和测试事项可以集中维护。",
+      "H5 需求开发已经形成固定流程：先确定页面范围、渲染模式、BFF mock、接口契约、外部运行环境依赖和测试口径，再进入页面实现。",
+      "飞书知识库和飞书多维表格已经纳入协作流：对接文档、路由说明、排期、接口需求、外部依赖和测试事项可以集中维护。",
       "发版通告已经接入飞书审核流：先发审核群，经负责人确认后再发正式对接群，避免未确认内容直接打扰大家。",
     ],
     h5Architecture: override.h5Architecture?.length ? override.h5Architecture : [
       "H5 使用 Next.js 承载，线上按 `/h5-v/<version>` 多版本路径发布，静态资源会跟随版本 basePath，避免新旧版本资源串用。",
-      "版本控制已经从手写 URL 收敛到 active manifest：App 读取 manifest 后再拼 H5 URL，后续切 active 或回滚不需要重新发 App。",
-      "H5 已建立 Bridge 路由抽象，统一处理 H5 内跳转、打开新 WebView、关闭 WebView、切回原生 Tab 和打开原生页面。",
+      "版本控制已经从手写 URL 收敛到 active manifest：固定入口和外部容器读取 manifest 后再拼 H5 URL，后续切 active 或回滚不需要改二维码或重新发 H5 代码。",
+      "H5 已建立 Bridge 路由抽象，统一处理 H5 内跳转、打开新 WebView、关闭 WebView、切回外部 Tab 和打开外部页面。",
       "H5 已接入运行时 cookie 调试能力，能读取 `pythonToken`、`mallToken`、`statusHeight`，后续请求会按 Java/Python 服务分别带 Authorization。",
       "页面侧已经开始收敛设计体系：颜色、间距、顶部导航、静态图片资产、版本 basePath 引用都有统一规则。",
     ],
     pageProgress: override.pageProgress?.length ? override.pageProgress : [
-      "一级 Tab 页面已完成首轮闭环，H5 页面不再保留原生 Tab，Tab 由原生 App 承载。",
+      "一级 Tab 页面已完成首轮闭环，H5 页面不再保留外部容器 Tab，Tab 由外部运行环境承载。",
       "推广首页已完成高保真版本，并接入达人等级、带货汇总、页面入口和本地静态资源体系。",
       "权益中心已完成高保真和等级切换交互，支持左右切换、等级主题、特权列表和权益图片资源。",
       "榜单中心、销量榜、销售额榜已按设计方向推进，排行榜静态资源和顶部视觉正在收敛到可复用资产。",
       "活动中心、佣金收益、商品详情、搜索等页面已纳入页面盘点和路由协作范围，后续按单页面需求继续拆分开发和联调。",
     ],
     crossTeamProgress: override.crossTeamProgress?.length ? override.crossTeamProgress : [
-      "Release 服务已支持版本注册、active manifest、候选版本、切 active 和回滚信息。",
+      "Java H5 版本管理已支持版本注册、active manifest、候选版本、切 active 和回滚信息。",
       "Jenkins / 本地发布脚本已经能构建 H5 多版本容器，并把候选版本发布到测试服务器。",
       "Nginx 已按版本路径转发 H5 容器，`hybird.aigcpop.com` 作为 App 侧统一入口。",
-      "原生 App 对接文档已经补充 WebView 容器策略、路由跳转原则、Bridge 调用清单和 iOS/Android/H5 职责边界。",
+      "外部运行环境对接文档已经补充 WebView 容器策略、路由跳转原则、Bridge 调用清单和 H5 侧职责边界。",
     ],
     nativeImpact: override.nativeImpact?.length ? override.nativeImpact : [
-      "App 侧不需要写死 H5 版本地址，只需要读取 active manifest，然后按 `serviceBaseUrl + basePath + route` 拼接最终 URL。",
+      "外部入口不需要写死 H5 版本地址，只需要读取 active manifest，然后按 `serviceBaseUrl + basePath + route` 拼接最终 URL。",
       "首页、搜索、商品详情、消息、分类等场景会区分当前 WebView 内 push 和新开 H5 WebView，目的是保留首页缓存和滚动位置。",
       "二级/三级 H5 页面返回首页或其他 Tab 根页面时，H5 会通过 Bridge 通知原生关闭当前 WebView 或切 Tab。",
     ],
     backendImpact: override.backendImpact?.length ? override.backendImpact : [
       "当前推广、权益、榜单等页面仍以 H5 BFF mock 和静态配置为主，没有把 mock 当成正式业务接口。",
-      "后续每个页面会按需求主体拆出后端接口子需求，明确 Java/Python 服务、鉴权 token、字段、分页、错误码和兜底规则。",
-      "首页运营配置、活动配置、榜单数据、权益数据、佣金收益等都需要后端/管理台逐步提供正式接口或配置能力。",
+      "后续每个页面会按需求主体拆出 Java/API 子需求，明确服务、鉴权 token、字段、分页、错误码和兜底规则。",
+      "首页运营配置、活动配置、榜单数据、权益数据、佣金收益等都需要 Java/API 或配置平台逐步提供正式接口或配置能力。",
     ],
     testImpact: override.testImpact?.length ? override.testImpact : [
-      "测试重点从单页面 UI 扩展到版本切换、静态资源、App WebView 容器、Bridge 返回、cookie/token 和接口兜底。",
+      "测试重点从单页面 UI 扩展到版本切换、静态资源、外部 WebView 容器、Bridge 返回、cookie/token 和接口兜底。",
       "每次 H5 发版会给出当前版本的验证结果和需要重点回归的链路。",
     ],
     nativeNeeded: override.nativeNeeded?.length ? override.nativeNeeded : [
-      "确认 App 侧 active manifest 读取、URL 拼接、缓存策略和 WebView 新开/关闭规则。",
-      "确认 Bridge 能力实现清单：`open`、`back`、`close_webview`、`tab`、`native_page`、`route_changed` 等能力由原生侧接收并处理。",
+      "确认外部入口 active manifest 读取、URL 拼接、缓存策略和 WebView 新开/关闭规则。",
+      "确认 Bridge 能力实现清单：`open`、`back`、`close_webview`、`tab`、`native_page`、`route_changed` 等能力由外部运行环境接收并处理。",
       "实机验证 cookie 写入：`pythonToken`、`mallToken`、`statusHeight` 必须在 H5 WebView 内可读取。",
     ],
     backendNeeded: override.backendNeeded?.length ? override.backendNeeded : [
       "按页面补齐正式业务接口：推广首页、权益中心、榜单中心、排行榜、活动中心、佣金收益等。",
       "明确接口环境、鉴权方式、错误码、分页规则、空态规则和 mock 到正式接口的切换时间。",
-      "管理台需要补齐首页配置、活动配置、素材配置、版本配置和上下线规则，避免 H5 长期写死运营内容。",
+      "Java 配置平台需要补齐首页配置、活动配置、素材配置、版本配置和上下线规则，避免 H5 长期写死运营内容。",
     ],
     testNeeded: override.testNeeded?.length ? override.testNeeded : [
-      "补充 App 内 H5 打开、H5 内跳转、新 WebView、关闭返回、Tab 切换、token 过期重新认证等联调用例。",
+      "补充外部容器内 H5 打开、H5 内跳转、新 WebView、关闭返回、Tab 切换、token 过期重新认证等联调用例。",
       "提供测试账号、测试 token、设备覆盖范围和验收标准，方便 H5 发版后快速做 smoke 和回归。",
     ],
     futureNoticeRule: override.futureNoticeRule?.length ? override.futureNoticeRule : [
       "今天这条是项目总览，只用于建立共同背景。",
-      "后续每个 H5 版本只同步当前版本改了什么、相对上个版本影响哪里、验证结果如何、还需要原生/后端/测试配合什么。",
-      "如果某个版本只改 H5 页面，不涉及原生或后端，也会明确写出来，避免大家误以为需要额外联调。",
+      "后续每个 H5 版本只同步当前版本改了什么、相对上个版本影响哪里、验证结果如何、还需要外部运行环境、Java/API 或测试配合什么。",
+      "如果某个版本只改 H5 页面，不涉及外部运行环境或 Java/API，也会明确写出来，避免大家误以为需要额外联调。",
     ],
   };
 }
@@ -999,15 +999,15 @@ function buildReleaseNotice(context, config) {
       : [
           "H5 已按 active manifest 版本体系发布，当前版本入口是 `/h5-v/<version>`。",
           "H5 已发出 Bridge route：`webview`、`tab`、`back`、`close_webview`、`native_page=settings`。",
-          "H5 已上报 `event/route_changed`，方便原生侧同步 WebView 内部路由状态。",
+          "H5 已上报 `event/route_changed`，方便外部运行环境同步 WebView 内部路由状态。",
         ],
     nativeNeeded: override.nativeNeeded?.length
       ? override.nativeNeeded
       : knownReleaseNotice.nativeNeeded?.length
         ? knownReleaseNotice.nativeNeeded
       : [
-          "请确认 App 启动和打开 H5 时以 Java H5 版本管理 active manifest 为准，不要读旧 Python manifest，也不要写死某个版本 URL。",
-          "请确认原生侧已处理 `tab`、`close_webview`、`native_page=settings` 和 `route_changed`，尤其是二级 WebView 返回首页/Tab 根页面时要关闭当前 WebView。",
+          "请确认外部入口打开 H5 时以 Java H5 版本管理 active manifest 为准，不要读旧 Python manifest，也不要写死某个版本 URL。",
+          "请确认外部运行环境已处理 `tab`、`close_webview`、`native_page=settings` 和 `route_changed`，尤其是二级 WebView 返回首页/Tab 根页面时要关闭当前 WebView。",
           "请实机验证：首页打开搜索/消息/分类/商品详情的新 WebView 策略，以及从二级页返回后首页滚动位置是否保留。",
         ],
     backendDone: override.backendDone?.length
@@ -1023,8 +1023,8 @@ function buildReleaseNotice(context, config) {
       : knownReleaseNotice.backendNeeded?.length
         ? knownReleaseNotice.backendNeeded
       : [
-          "后续正式联调前，需要补齐推广首页、权益中心、榜单中心、佣金收益等业务接口，并明确 Java/Python token 分别使用哪个服务。",
-          "如果首页、推广页或活动入口要从管理后台配置，请后端/管理台提前给出字段结构、上下线规则和兜底数据。",
+          "后续正式联调前，需要补齐推广首页、权益中心、榜单中心、佣金收益等业务接口，并明确 Java token 使用规则。",
+          "如果首页、推广页或活动入口要从 Java 配置平台配置，请 Java/API 提前给出字段结构、上下线规则和兜底数据。",
           "当前没有支付、订单创建、真实佣金结算接口接入；涉及资金或交易的数据请以后端真实接口为准，H5 不会伪造。",
         ],
     testFocus: override.testFocus?.length
@@ -1032,7 +1032,7 @@ function buildReleaseNotice(context, config) {
       : knownReleaseNotice.testFocus?.length
         ? knownReleaseNotice.testFocus
       : [
-          "请重点回归 App 内打开 H5、H5 内跳 H5、H5 返回/关闭 WebView、切回 Tab 根页面这几条链路。",
+          "请重点回归外部容器打开 H5、H5 内跳 H5、H5 返回/关闭 WebView、切回 Tab 根页面这几条链路。",
           "请检查 `/member` 已不可访问，旧入口不要再出现。",
           "请检查版本角标、图片资源、权益中心/推广相关页面是否有白屏或 404。",
         ],

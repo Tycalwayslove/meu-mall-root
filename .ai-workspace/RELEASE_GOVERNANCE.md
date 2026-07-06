@@ -7,11 +7,14 @@
 ## 发布对象
 
 - H5 SSR release。
-- manifest active config。
-- server API 行为。
-- admin 发布操作台。
-- iOS WebView 壳。
-- CI pipeline。
+- Java H5 版本管理中的 manifest active config。
+- H5 发布脚本和 Nginx 入口。
+
+以下历史对象不再属于当前仓库发布范围：
+
+- 旧 Python `server-meumall` API。
+- 旧 `admin-meumall` 发布操作台。
+- 旧 `app-meumall` iOS WebView 壳。
 
 ## 发布影响声明
 
@@ -73,7 +76,7 @@ H5 release 必须能通过 manifest 切换。发布记录应包含：
 
 H5 发版审核不是发布完成后的自由总结，而是发布流程的一部分。每次发送飞书审核消息前，必须先建立可追溯的对比基准：
 
-- 当前线上 active 版本必须从当前发布体系读取。Jenkins/Java H5 发版以 Java H5 版本管理 active/list 接口为准，不得使用旧 Python/prod active manifest 代替。
+- 当前线上 active 版本必须从当前发布体系读取。H5 发版以 Java H5 版本管理 active/list 接口为准，不得使用旧 Python/prod active manifest 代替。
 - 必须拿到当前线上 active 版本对应的 `buildMeta.gitCommit`，并拿到本次待审核版本对应的 `buildMeta.gitCommit`。
 - 改动范围必须是 `activeCommit..targetCommit`；审核消息中必须写明 `activeVersion`、`activeCommit`、`targetVersion`、`targetCommit` 和 diff 范围。
 - 如果目标版本已被 promote 成 active，必须改用 `rollbackVersion` 或上一条 active/published release 的 commit 作为基准，并在审核消息中说明原因。
