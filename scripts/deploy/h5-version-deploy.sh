@@ -86,6 +86,52 @@ process.stdout.write(packageJson.version);
 ' "${H5_SOURCE_DIR}/package.json"
 }
 
+discover_h5_routes() {
+  node - "${H5_SOURCE_DIR}" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+
+const h5SourceDir = process.argv[2];
+const appDir = path.join(h5SourceDir, "src/app");
+const pageFilePattern = /^page\.(js|jsx|ts|tsx|mdx)$/;
+const routes = new Set();
+
+function walk(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      walk(fullPath);
+      continue;
+    }
+    if (!entry.isFile() || !pageFilePattern.test(entry.name)) {
+      continue;
+    }
+
+    const routeDir = path.dirname(path.relative(appDir, fullPath));
+    const segments = routeDir === "." ? [] : routeDir.split(path.sep).filter((segment) => {
+      return segment && segment !== "api" && !segment.startsWith("(") && !segment.startsWith("_");
+    });
+    if (segments.includes("api")) {
+      continue;
+    }
+
+    routes.add(segments.length === 0 ? "/" : `/${segments.join("/")}`);
+  }
+}
+
+if (!fs.existsSync(appDir) || !fs.statSync(appDir).isDirectory()) {
+  process.exit(2);
+}
+
+walk(appDir);
+process.stdout.write(Array.from(routes).sort((left, right) => {
+  if (left === "/") return -1;
+  if (right === "/") return 1;
+  return left.localeCompare(right);
+}).join(","));
+NODE
+}
+
 resolve_git_commit() {
   local git_ref="$1"
   git -C "${H5_SOURCE_DIR}" rev-parse "${git_ref}^{commit}" 2>/dev/null
@@ -217,7 +263,14 @@ NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL:-/api/bff}"
 H5_BFF_LOG_BACKEND_RESPONSE="${H5_BFF_LOG_BACKEND_RESPONSE:-0}"
 H5_BFF_BACKEND_RESPONSE_LOG_LIMIT="${H5_BFF_BACKEND_RESPONSE_LOG_LIMIT:-30000}"
 
-H5_ROUTES="${H5_ROUTES:-/,/promotion,/mine,/category,/messages,/seckill,/product/p-1001,/consult,/order-confirm,/orders,/favorites/products,/favorites/shops,/promotion/products,/promotion/commission,/promotion/card,/promotion/level,/promotion/benefits,/promotion/activities,/promotion/rank-center,/promotion/ranking,/promotion/ranking/sales,/promotion/ranking/amount}"
+if [ -z "${H5_ROUTES:-}" ]; then
+  H5_ROUTES="$(discover_h5_routes)"
+  echo "已从 H5 src/app 自动发现 release routes：$(printf '%s' "${H5_ROUTES}" | awk -F',' '{print NF}') 条"
+fi
+if [ -z "${H5_ROUTES}" ]; then
+  echo "H5_ROUTES 不能为空，且未能从 ${H5_SOURCE_DIR}/src/app 自动发现页面路由。" >&2
+  exit 2
+fi
 REGISTER_RELEASE="${REGISTER_RELEASE:-true}"
 PROMOTE_RELEASE="${PROMOTE_RELEASE:-false}"
 INSTALL_NGINX="${INSTALL_NGINX:-true}"

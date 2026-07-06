@@ -37,6 +37,8 @@ H5 release 必须能通过 manifest 切换。发布记录应包含：
 - routes。
 - buildMeta。
 
+`routes` 必须以 `hybird-meumall/src/app/**/page.*` 为事实源，由 Jenkins 核心脚本或 `hybird-meumall/scripts/ai/register-release.ts` 自动发现后写入 release payload。不得把手写静态路由清单作为默认发版来源；只有临时兼容或灰度验证场景允许显式传入 `H5_ROUTES` 覆盖，并且必须在发版审核中说明原因和缺口。
+
 ## 灰度规则
 
 灰度必须明确：

@@ -38,6 +38,8 @@ App 不应该写死某个 H5 URL，而是先读取 Java H5 版本管理 active m
 
 manifest 中的 `stableVersion`、`assets.serviceBaseUrl`、`assets.basePath` 和 `routes` 决定当前 App 应加载哪个 H5 版本。
 
+`routes` 的事实源是 `hybird-meumall/src/app/**/page.*`。Jenkins 核心脚本会在发布时自动扫描 App Router 页面并写入 release payload；`hybird-meumall/scripts/ai/register-release.ts` 在未传 `--routes` 时也会自动扫描。除临时兼容验证外，不应在 Jenkins 参数里手写 `H5_ROUTES`，否则新增页面容易漏进 Java active manifest。
+
 ## 发版前必须确认
 
 发版前先确认这些条件：
