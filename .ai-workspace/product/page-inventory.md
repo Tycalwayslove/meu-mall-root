@@ -11,7 +11,7 @@ draft，已按 2026-07-06 当前 H5-only 仓库边界、H5 实际路由、实现
 - 初扫日期：2026-06-01
 - 最近仓库更新：2026-07-06
 - 飞书知识库链接：<https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre>
-- 最近飞书同步：2026-07-06，revision_id=75，补充旧 `server-meumall`、`admin-meumall`、`app-meumall`、`meumall-ci` 已从当前工作区物理移除。上一轮 revision_id=74 补充 H5-only 仓库边界。
+- 最近飞书同步：2026-07-06，revision_id=76，补充首页 banner 按 Apifox `jumpType` 分流：H5 URL/路径、商品详情、商城活动承接页、达人激励活动详情、带货排行榜。上一轮 revision_id=75 补充旧 `server-meumall`、`admin-meumall`、`app-meumall`、`meumall-ci` 已从当前工作区物理移除。
 
 ## 说明
 
@@ -64,7 +64,7 @@ draft，已按 2026-07-06 当前 H5-only 仓库边界、H5 实际路由、实现
 
 | 路由 | 页面 | 当前状态 | 数据来源 | 容器策略 | 备注 |
 | --- | --- | --- | --- | --- | --- |
-| `/` | 首页 | 已接真实 BFF | Java `/p/app/home/index` 的 `banners/navList`，推荐分页接口；限时秒杀/推广带货入口为 H5 固定 UI | Tab 根 WebView | 推荐商品可下滑加载更多；首页类目直接展示 `navList`；`navType=1` 跳 `/search/ranking`，若带 `rankType/categoryId` 则打开指定热榜标签；`navType=2` 跳 `/search?categoryId=<id>`；`navType=3` 跳 `/category`；banner 为空时不展示轮播图，类目为空时展示灰色圆角块骨架屏；接口失败或业务模块缺失时不回退本地 mock；固定入口分别跳 `/seckill` 和 `/promotion/products` |
+| `/` | 首页 | 已接真实 BFF | Java `/p/app/home/index` 的 `banners/navList`，推荐分页接口；限时秒杀/推广带货入口为 H5 固定 UI | Tab 根 WebView | 推荐商品可下滑加载更多；首页 banner 按 Apifox `jumpType` 分流：H5 URL/路径、商品详情、商城活动承接页、达人激励活动详情、带货排行榜；首页类目直接展示 `navList`；`navType=1` 跳 `/search/ranking`，若带 `rankType/categoryId` 则打开指定热榜标签；`navType=2` 跳 `/search?categoryId=<id>`；`navType=3` 跳 `/category`；banner 为空时不展示轮播图，类目为空时展示灰色圆角块骨架屏；接口失败或业务模块缺失时不回退本地 mock；固定入口分别跳 `/seckill` 和 `/promotion/products` |
 | `/register` | 运营外部注册页 | 已接注册/认证流程，公开入口由 Node resolver 解析 | 注册短信验证码、用户注册、认证开户 H5、会员信息查询 | 外部 H5 / 新 WebView | 对外二维码固定使用 `https://hybird.aigcpop.com/register`；Node resolver 调用 Java active manifest 后 302 到 active H5 版本 `/h5-v/<version>/register`；这是运营外部注册例外，不是 App 内登录页注册入口 |
 | `/home/recommend-products` | 相似推荐商品 | 已接真实 BFF | Java `/p/app/home/forYouProds` | 新 H5 WebView | 从首页“更多”进入；接口失败或空列表不拼接本地 mock |
 | `/mine` | 我的 | 已接真实 BFF | BFF `/api/bff/mine/summary` -> Java `/p/app/profile/summary`、`/p/daren/level/myLevel` | Tab 根 WebView | 钱包余额、今年已省、优惠券和当前达人等级使用真实接口；失败或 token 缺失展示错误态，不回退本地 mock |

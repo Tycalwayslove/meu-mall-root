@@ -215,6 +215,7 @@ type AppHomeVO = {
 
 ```ts
 type AppBannerVO = {
+  clientType?: number;
   imgUrl?: string;
   seq?: number;
   uploadTime?: string;
@@ -231,11 +232,13 @@ type AppBannerVO = {
 
 | 值 | 含义 | H5 初始映射 |
 | --- | --- | --- |
-| `1` | H5 | `jumpValue` |
-| `2` | 商品详情 | `/product/<jumpValue or relation>` |
-| `3` | 活动页 | `/promotion/activities` |
-| `4` | 激励活动 | `/promotion/activities` |
-| `5` | 带货排行榜 | `/promotion/rank-center` |
+| `1` | H5 | `jumpValue` 为 `http(s)` URL 时按外链新开 WebView；为 H5 路径时按对应 H5 路由新开 WebView；如果是 Tab 根路径 `/`、`/promotion`、`/mine`，切换对应 Tab。 |
+| `2` | 商品详情 | `/product/<jumpValue or relation>`，新开 H5 WebView。 |
+| `3` | 活动页 / 商城活动 | `jumpValue` 为 URL 或 H5 路径时尊重后端目标；仅返回业务 ID 时暂映射 `/promotion/activities?activityId=<id>`，作为活动承接页，待后续确认商城活动详情页路由。 |
+| `4` | 激励活动 / 达人激励活动 | `jumpValue` 为 URL 或 H5 路径时尊重后端目标；仅返回业务 ID 时映射 `/promotion/activities/<id>`。无目标时进入 `/promotion/activities`。 |
+| `5` | 带货排行榜 | `jumpValue=1` 映射 `/promotion/ranking/sales`；`jumpValue=2` 映射 `/promotion/ranking/amount`；URL/H5 路径优先；无目标或未知值进入 `/promotion/rank-center`。 |
+
+Apifox `PlatformBannerVO` 当前描述为：`jumpType` 跳转类型 `1H5 2商品详情 3活动页 4激励活动 5带货排行榜`，`jumpValue` 为 `URL或业务ID`；管理端 `PlatformBannerDto/Param` 对 `3/4` 的描述分别为 `商城活动 / 达人激励活动`。H5 按上表做兼容消费，不要求后端新增字段。
 
 ### 热榜
 
@@ -458,7 +461,7 @@ type H5BffResult<T> =
 
 ## 测试方式
 
-- Mapper 单测覆盖 banner、`navList` 分类、固定活动入口和推荐商品映射；分类必须覆盖 `navList` 直接展示、不同 `navType` 路由和旧 `hotCategory/categoryTop8` 不再拼接；活动入口必须覆盖 Java 首页聚合缺少活动/秒杀数据时仍展示固定入口。
+- Mapper 单测覆盖 banner、`navList` 分类、固定活动入口和推荐商品映射；banner 必须覆盖 `jumpType=1/2/3/4/5` 的跳转分流和导航策略；分类必须覆盖 `navList` 直接展示、不同 `navType` 路由和旧 `hotCategory/categoryTop8` 不再拼接；活动入口必须覆盖 Java 首页聚合缺少活动/秒杀数据时仍展示固定入口。
 - BFF service 单测覆盖：首屏聚合接口只请求 `/p/app/home/index`；首页推荐分页接口按 `current/size` 请求 `/p/app/home/recommendProds`；“相似推荐商品”页面分页接口按 `current/size` 请求 `/p/app/home/forYouProds`。
 - 首页组件测试覆盖接口成功和失败错误态；失败时不展示本地 mock 首页业务数据。
 - 推荐更多入口测试覆盖首页“更多”跳转 `/home/recommend-products`。
