@@ -16,9 +16,9 @@ if [ -n "${CONFIG_FILE}" ]; then
   set +a
 fi
 
-WORKSPACE_DIR="${H5_RELEASE_WORKSPACE_DIR:-${ROOT_DIR}/.workspaces/h5-release}"
-H5_GIT_URL="${H5_GIT_URL:-git@github.com:Tycalwayslove/hybird-meumall.git}"
-H5_GIT_BRANCH="${H5_GIT_BRANCH:-main}"
+LOCAL_H5_SOURCE_DIR="${H5_SOURCE_DIR:-${ROOT_DIR}/hybird-meumall}"
+H5_GIT_URL="${H5_GIT_URL:-}"
+H5_GIT_BRANCH="${H5_GIT_BRANCH:-}"
 H5_RELEASE_ENV="${H5_RELEASE_ENV:-test}"
 PROMOTE_RELEASE="${PROMOTE_RELEASE:-false}"
 REGISTER_RELEASE="${REGISTER_RELEASE:-true}"
@@ -30,28 +30,63 @@ REMOTE_KEEP_RELEASES="${REMOTE_KEEP_RELEASES:-1}"
 ALLOW_INITIAL_H5_RELEASE="${ALLOW_INITIAL_H5_RELEASE:-true}"
 ALLOW_REPEAT_H5_COMMIT_RELEASE="${ALLOW_REPEAT_H5_COMMIT_RELEASE:-false}"
 
-if [ -z "${H5_GIT_URL}" ]; then
-  echo "H5_GIT_URL 不能为空；请配置 H5 远程 Git 地址。" >&2
+checkout_h5_branch() {
+  local workspace_dir="$1"
+  local branch="$2"
+
+  if [ -z "${branch}" ]; then
+    return 0
+  fi
+
+  git -C "${workspace_dir}" fetch --prune --tags origin >/dev/null 2>&1 || true
+
+  if git -C "${workspace_dir}" rev-parse --verify "origin/${branch}^{commit}" >/dev/null 2>&1; then
+    git -C "${workspace_dir}" checkout -B "jenkins/${branch//\//-}" "origin/${branch}"
+    return 0
+  fi
+
+  if git -C "${workspace_dir}" rev-parse --verify "${branch}^{commit}" >/dev/null 2>&1; then
+    git -C "${workspace_dir}" checkout "${branch}"
+    return 0
+  fi
+
+  echo "找不到 H5 分支：${branch}。请确认 Jenkins 参数 H5_GIT_BRANCH 或 H5_GIT_URL 配置。" >&2
   exit 2
-fi
+}
 
-mkdir -p "${WORKSPACE_DIR}"
-if [ ! -d "${WORKSPACE_DIR}/.git" ]; then
-  rm -rf "${WORKSPACE_DIR}"
-  git clone "${H5_GIT_URL}" "${WORKSPACE_DIR}"
+if [ -n "${H5_GIT_URL}" ]; then
+  WORKSPACE_DIR="${H5_RELEASE_WORKSPACE_DIR:-${ROOT_DIR}/.workspaces/h5-release}"
+  H5_GIT_BRANCH="${H5_GIT_BRANCH:-main}"
+
+  mkdir -p "${WORKSPACE_DIR}"
+  if [ ! -d "${WORKSPACE_DIR}/.git" ]; then
+    rm -rf "${WORKSPACE_DIR}"
+    git clone "${H5_GIT_URL}" "${WORKSPACE_DIR}"
+  else
+    git -C "${WORKSPACE_DIR}" remote set-url origin "${H5_GIT_URL}"
+  fi
+
+  checkout_h5_branch "${WORKSPACE_DIR}" "${H5_GIT_BRANCH}"
+
+  git -C "${WORKSPACE_DIR}" reset --hard
+  git -C "${WORKSPACE_DIR}" clean -fdx \
+    -e node_modules \
+    -e .next \
+    -e archives/releases
 else
-  git -C "${WORKSPACE_DIR}" remote set-url origin "${H5_GIT_URL}"
+  WORKSPACE_DIR="${H5_RELEASE_WORKSPACE_DIR:-${LOCAL_H5_SOURCE_DIR}}"
+  if [ ! -d "${WORKSPACE_DIR}/.git" ]; then
+    echo "找不到本地 H5 仓库：${WORKSPACE_DIR}" >&2
+    echo "当前工作区默认使用 hybird-meumall；如需外部 Jenkins 克隆远程仓库，请显式配置 H5_GIT_URL。" >&2
+    exit 2
+  fi
+
+  if [ -n "${H5_GIT_BRANCH}" ]; then
+    echo "未配置 H5_GIT_URL，使用当前工作区 H5 仓库；忽略 Jenkins 分支参数 H5_GIT_BRANCH=${H5_GIT_BRANCH}。"
+    echo "如需按远程分支构建，请显式配置 H5_GIT_URL。"
+  fi
+  H5_GIT_BRANCH="$(git -C "${WORKSPACE_DIR}" branch --show-current)"
 fi
-
-git -C "${WORKSPACE_DIR}" fetch --prune --tags origin
-
-git -C "${WORKSPACE_DIR}" checkout -B "jenkins/${H5_GIT_BRANCH//\//-}" "origin/${H5_GIT_BRANCH}"
-
-git -C "${WORKSPACE_DIR}" reset --hard
-git -C "${WORKSPACE_DIR}" clean -fdx \
-  -e node_modules \
-  -e .next \
-  -e archives/releases
 
 H5_RUNTIME_ENV_FILE="${H5_RUNTIME_ENV_FILE:-${WORKSPACE_DIR}/config/env/h5.${H5_RELEASE_ENV}.env}"
 if [ ! -f "${H5_RUNTIME_ENV_FILE}" ]; then
