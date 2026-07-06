@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-JENKINS_URL="${JENKINS_URL:-http://127.0.0.1:8080}"
+JENKINS_URL="${JENKINS_URL:-http://127.0.0.1:8082}"
 JENKINS_URL="${JENKINS_URL%/}"
 JENKINS_JOB_NAME="${JENKINS_JOB_NAME:-meu-mall-h5-test-release}"
 JENKINS_PIPELINE_FILE="${JENKINS_PIPELINE_FILE:-${ROOT_DIR}/deploy/jenkins/meu-mall-h5-version-deploy.groovy}"

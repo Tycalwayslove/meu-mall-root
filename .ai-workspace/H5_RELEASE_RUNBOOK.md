@@ -490,7 +490,7 @@ deploy/jenkins/meu-mall-h5-version-deploy.groovy
 
 ```bash
 cd /Users/mac/person_code/meu-mall
-JENKINS_URL=http://127.0.0.1:8080 \
+JENKINS_URL=http://127.0.0.1:8082 \
 JENKINS_USER='<jenkins 用户名>' \
 JENKINS_TOKEN='<jenkins API token 或密码>' \
 pnpm run jenkins:sync-h5
