@@ -31,7 +31,8 @@ jenkins_curl() {
 }
 
 CONFIG_XML="$(mktemp "${TMPDIR:-/tmp}/meumall-h5-jenkins-job.XXXXXX")"
-trap 'rm -f "${CONFIG_XML}"' EXIT
+CRUMB_HEADERS="$(mktemp "${TMPDIR:-/tmp}/meumall-h5-jenkins-headers.XXXXXX")"
+trap 'rm -f "${CONFIG_XML}" "${CRUMB_HEADERS}"' EXIT
 
 JENKINS_JOB_NAME="${JENKINS_JOB_NAME}" \
 JENKINS_PIPELINE_FILE="${JENKINS_PIPELINE_FILE}" \
@@ -95,7 +96,8 @@ if [ "${DRY_RUN}" = "true" ]; then
 fi
 
 crumb_header_value=""
-crumb_json="$(jenkins_curl -fsS "${JENKINS_URL}/crumbIssuer/api/json" 2>/dev/null || true)"
+crumb_cookie_value=""
+crumb_json="$(jenkins_curl -fsS -D "${CRUMB_HEADERS}" "${JENKINS_URL}/crumbIssuer/api/json" 2>/dev/null || true)"
 if [ -n "${crumb_json}" ]; then
   crumb_value="$(
     CRUMB_JSON="${crumb_json}" python3 <<'PY'
@@ -115,6 +117,22 @@ PY
   if [ -n "${crumb_value}" ]; then
     crumb_header_value="${crumb_value}"
   fi
+  crumb_cookie_value="$(
+    python3 - "${CRUMB_HEADERS}" <<'PY'
+import sys
+from pathlib import Path
+
+headers = Path(sys.argv[1]).read_text(encoding="utf-8", errors="ignore").splitlines()
+cookies = []
+for line in headers:
+    if line.lower().startswith("set-cookie:"):
+        value = line.split(":", 1)[1].strip().split(";", 1)[0]
+        if value:
+            cookies.append(value)
+if cookies:
+    print("; ".join(cookies))
+PY
+  )"
 fi
 
 job_status="$(
@@ -126,11 +144,20 @@ post_config_xml() {
   local target_url="$1"
 
   if [ -n "${crumb_header_value}" ]; then
-    jenkins_curl -fsS -X POST \
-      -H "${crumb_header_value}" \
-      -H "Content-Type: application/xml" \
-      --data-binary "@${CONFIG_XML}" \
-      "${target_url}" >/dev/null
+    if [ -n "${crumb_cookie_value}" ]; then
+      jenkins_curl -fsS -X POST \
+        -H "${crumb_header_value}" \
+        -H "Cookie: ${crumb_cookie_value}" \
+        -H "Content-Type: application/xml" \
+        --data-binary "@${CONFIG_XML}" \
+        "${target_url}" >/dev/null
+    else
+      jenkins_curl -fsS -X POST \
+        -H "${crumb_header_value}" \
+        -H "Content-Type: application/xml" \
+        --data-binary "@${CONFIG_XML}" \
+        "${target_url}" >/dev/null
+    fi
   else
     jenkins_curl -fsS -X POST \
       -H "Content-Type: application/xml" \
