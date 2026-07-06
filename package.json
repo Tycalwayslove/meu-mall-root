@@ -16,6 +16,7 @@
     "feishu:h5-release-approve": "node scripts/feishu/h5-release-notice.mjs mark-approved --approved-by 唐游超 --approval-note 飞书审核群已确认",
     "deploy": "bash scripts/deploy/h5-version-deploy.sh",
     "deploy:h5": "bash scripts/deploy/h5-version-deploy.sh",
-    "deploy:h5-version": "bash scripts/deploy/h5-version-deploy.sh"
+    "deploy:h5-version": "bash scripts/deploy/h5-version-deploy.sh",
+    "jenkins:sync-h5": "bash scripts/jenkins/sync-h5-job.sh"
   }
 }

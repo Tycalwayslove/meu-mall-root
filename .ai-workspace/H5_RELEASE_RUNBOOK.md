@@ -478,6 +478,47 @@ active manifest、注册、promote、gray、rollback 接口按 Java `data` wrapp
 
 旧 Python/prod active manifest 只能作为历史生产链路兜底，不能作为 Jenkins/Java 测试发版审核的线上版本来源。当前测试发版线上 active 版本必须以 Java H5 版本管理为准。
 
+### 同步 Jenkins 管道
+
+旧 `meumall-ci` 工作区已经移除，仓库不会再通过本地 Jenkins init groovy 自动生成多个历史 job。当前只维护一个 H5 发版 Pipeline 定义：
+
+```text
+deploy/jenkins/meu-mall-h5-version-deploy.groovy
+```
+
+第一次配置 Jenkins、Jenkins job 被删除、或 Pipeline 定义文件变更后，需要显式同步 H5 job：
+
+```bash
+cd /Users/mac/person_code/meu-mall
+JENKINS_URL=http://127.0.0.1:8080 \
+JENKINS_USER='<jenkins 用户名>' \
+JENKINS_TOKEN='<jenkins API token 或密码>' \
+pnpm run jenkins:sync-h5
+```
+
+默认同步的 job 名是：
+
+```text
+meu-mall-h5-test-release
+```
+
+如需修改 Jenkins 地址、job 名或 Pipeline 文件，可以覆盖：
+
+```bash
+JENKINS_URL=https://jenkins.example.com \
+JENKINS_JOB_NAME=meu-mall-h5-test-release \
+JENKINS_PIPELINE_FILE=/Users/mac/person_code/meu-mall/deploy/jenkins/meu-mall-h5-version-deploy.groovy \
+pnpm run jenkins:sync-h5
+```
+
+检查生成内容但不写入 Jenkins：
+
+```bash
+DRY_RUN=true pnpm run jenkins:sync-h5
+```
+
+同步脚本只创建或更新 H5 `workflow-job`。它不会恢复旧 `server/admin/app` job，也不会启动本地 Jenkins controller。
+
 ### 外部 Jenkins 发版
 
 H5 测试环境发版 job 可继续使用：
@@ -498,13 +539,13 @@ Jenkins 页面只需要选择：
 
 | 参数 | 建议 |
 | --- | --- |
-| `H5_GIT_BRANCH` | 从下拉列表选择要发布到测试环境的远程 H5 分支 |
+| `H5_GIT_BRANCH` | 可选。未配置 `H5_GIT_URL` 时会被忽略；配置 `H5_GIT_URL` 后按该远程分支构建 |
 
 其余测试环境参数应由外部 Jenkins 环境变量提供，或通过 `H5_TEST_RELEASE_CONFIG` 指向显式配置文件。不要再依赖仓库内 `meumall-ci/config/h5-test-release.env`。
 
 至少需要提供：
 
-- H5 固定仓库：`git@github.com:Tycalwayslove/hybird-meumall.git`
+- H5 源码来源：默认使用当前工作区 `hybird-meumall`；如需外部 Jenkins 克隆远程仓库，显式配置 `H5_GIT_URL=git@github.com:Tycalwayslove/hybird-meumall.git`，并传入 `H5_GIT_BRANCH`。
 - Java H5 版本管理 active/list base URL 和 token。测试环境管理系统前缀为 `https://test.aigcpop.com:18088/apis`，通过 `JAVA_H5_RELEASE_API_BASE_URL` 配置。
 - Jenkins 注册 H5 版本记录的写接口同样属于管理系统前缀，测试环境为 `https://test.aigcpop.com:18088/apis`，通过 `JAVA_H5_RELEASE_REGISTER_API_BASE_URL` 配置。
 - 注册写接口如需鉴权，配置 `JAVA_H5_RELEASE_REGISTER_TOKEN`；未配置时复用 `JAVA_H5_RELEASE_TOKEN`。若 Jenkins 报 `Unauthorized`，说明管理端注册接口尚未放行或 token 未配置。
@@ -513,7 +554,7 @@ Jenkins 页面只需要选择：
 - 是否注册 Java candidate、是否推 tag、是否清理旧 H5 容器/image/nginx location。测试环境默认 `REMOTE_KEEP_RELEASES=5`，即保留最近 5 个版本的容器、镜像、release 目录和 Nginx snippet。
 - 是否发送飞书审核群通知。测试环境默认 `SEND_FEISHU_REVIEW=true`，Jenkins 发版成功后只发送审核群待确认通报，不直接发送正式对接群。
 
-Jenkins 发版前不再要求本地 H5 工作区切到目标提交，也不要求提前创建 tag。Jenkins 会在独立工作目录拉取远程 H5 仓库的所选分支，部署和 smoke 通过后再创建并推送 `h5/vX.Y.Z` tag。
+Jenkins 发版前不要求提前创建 tag。未配置 `H5_GIT_URL` 时，脚本使用当前工作区的 `hybird-meumall`；配置 `H5_GIT_URL` 时，脚本会在独立工作目录拉取远程 H5 仓库的所选分支。部署和 smoke 通过后再创建并推送 `h5/vX.Y.Z` tag。
 
 默认版本号由 H5 仓库 `package.json` 的 major/minor 和远程 `h5/v*` tag 共同决定：同一 major/minor 下 patch 每次成功发版递增；当 `package.json` 从 `1.0.x` 升到 `2.0.0` 时，默认从 `v2.0.0` 开始。
 

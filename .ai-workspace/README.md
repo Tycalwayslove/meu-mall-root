@@ -83,3 +83,4 @@
 - `pnpm run dev:h5`：启动 `hybird-meumall`，默认端口 `3109`，basePath 为 `/hybird`。
 - `pnpm run check`：运行 H5 工作流检查。
 - `pnpm run deploy`：执行 H5 版本部署脚本。
+- `pnpm run jenkins:sync-h5`：创建或更新唯一 H5 发版 Jenkins Pipeline job。

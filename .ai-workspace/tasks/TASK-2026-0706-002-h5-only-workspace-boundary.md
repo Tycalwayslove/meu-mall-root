@@ -68,6 +68,7 @@ verified
 
 - [x] 根级 AI 工作流恢复入口明确只维护 `hybird-meumall`。
 - [x] 根命令不再包含 `dev:server`、`dev:admin`、`check:server`、`check:admin`、`check:app`。
+- [x] 根命令只保留 H5-only Jenkins job 同步入口，不恢复旧 `meumall-ci`。
 - [x] 旧 `meu-mall/server:test` 和 `meu-mall/admin:test` Docker/Compose 入口被移除。
 - [x] `server-meumall`、`admin-meumall`、`app-meumall` 和 `meumall-ci` 目录已从当前工作区物理移除。
 - [x] Nginx 模板不再代理 `/api/` 到旧 Python server，也不再代理 `/admin/` 到旧 admin。
@@ -81,9 +82,11 @@ verified
 cd /Users/mac/person_code/meu-mall
 bash -n scripts/deploy/h5-version-deploy.sh
 bash -n scripts/deploy/h5-jenkins-release.sh
+bash -n scripts/jenkins/sync-h5-job.sh
 bash -n scripts/root/check-all.sh
 node --check scripts/register-resolver/server.js
 node scripts/register-resolver/test.js
+DRY_RUN=true bash scripts/jenkins/sync-h5-job.sh
 DRY_RUN=true GIT_REF=HEAD ALLOW_INITIAL_H5_RELEASE=true H5_RELEASE_ENV=test bash scripts/deploy/h5-version-deploy.sh
 git diff --check
 ```
@@ -107,10 +110,12 @@ git diff --check
 - 2026-07-06：删除旧 server/admin Docker、Compose、Jenkins 测试服脚本和旧测试服部署文档；根命令收敛为 H5-only。
 - 2026-07-06：按最新要求物理删除旧 `server-meumall`、`admin-meumall`、`app-meumall` 和 `meumall-ci` 目录；删除根本地 Jenkins 启动脚本和 `ci:*` 命令。
 - 2026-07-06：飞书同步完成：项目总览 revision 5；页面盘点 revision 75；H5 发版流程 revision 9；H5 需求协作流程 revision 5。
+- 2026-07-06：补充 H5-only Jenkins Pipeline 同步入口 `scripts/jenkins/sync-h5-job.sh` 和根命令 `pnpm run jenkins:sync-h5`，用于在旧 `meumall-ci` 移除后创建或更新唯一 H5 发版 job。
 
 ## 验证结果
 
-- `bash -n scripts/root/dev-all.sh scripts/root/check-all.sh scripts/deploy/h5-version-deploy.sh scripts/deploy/h5-jenkins-release.sh`：通过。
+- `bash -n scripts/root/dev-all.sh scripts/root/check-all.sh scripts/deploy/h5-version-deploy.sh scripts/deploy/h5-jenkins-release.sh scripts/jenkins/sync-h5-job.sh`：通过。
+- `DRY_RUN=true bash scripts/jenkins/sync-h5-job.sh`：通过，已生成 H5 `workflow-job` 配置 XML。
 - `node --check scripts/register-resolver/server.js`：通过。
 - `node scripts/register-resolver/test.js`：通过。
 - `bash scripts/root/dev-lib.test.sh`：通过。
