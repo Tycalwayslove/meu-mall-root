@@ -2,16 +2,16 @@
 
 ## 状态
 
-draft，已按 2026-07-06 当前 H5-only 仓库边界、H5 实际路由、实现状态和订单迁移方案补充。
+draft，已按 2026-07-08 当前 H5-only 仓库边界、H5 实际路由、实现状态和订单/售后完整迁移进度补充。
 
 ## 来源
 
 - Figma：`喵呜APP`
 - 文件 key：`bNdmC9k76qgoZtYCdYSemL`
 - 初扫日期：2026-06-01
-- 最近仓库更新：2026-07-06
+- 最近仓库更新：2026-07-08
 - 飞书知识库链接：<https://v05ctaei9gn.feishu.cn/wiki/WgaqwTRRUitnRNkCtNPcOcDnnre>
-- 最近飞书同步：2026-07-06，revision_id=76，补充首页 banner 按 Apifox `jumpType` 分流：H5 URL/路径、商品详情、商城活动承接页、达人激励活动详情、带货排行榜。上一轮 revision_id=75 补充旧 `server-meumall`、`admin-meumall`、`app-meumall`、`meumall-ci` 已从当前工作区物理移除。
+- 最近飞书同步：2026-07-08，页面清单文档 revision_id=77，补充订单与售后主链路继续迁移：订单分页、订单详情退款入口、订单物流、售后列表/详情动作、退款申请、平台介入、退货物流和新增 BFF。上一轮 2026-07-06 revision_id=76 补充首页 banner 按 Apifox `jumpType` 分流：H5 URL/路径、商品详情、商城活动承接页、达人激励活动详情、带货排行榜。
 
 ## 说明
 
@@ -95,10 +95,15 @@ draft，已按 2026-07-06 当前 H5-only 仓库边界、H5 实际路由、实现
 | `/favorites/shops` | 我的收藏-店铺 | 静态占位 / 低保真 | 本地 mock | 新 H5 WebView | 店铺收藏高保真和接口待补 |
 | `/footprints` | 我的足迹 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/footprints` -> Java `/p/prodBrowseLog/page`；删除 `/api/bff/footprints/delete` -> `/p/prodBrowseLog` | 新 H5 WebView | 支持编辑态、全选和批量删除足迹；商品卡进入详情；列表空数据展示通用空态，不回退本地 mock |
 | `/coupons` | 我的优惠券 | 静态高保真 | 本地 mock | 新 H5 WebView | 优惠券领取/使用接口待接 |
-| `/orders` | 订单列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders` -> Java `/p/myOrder/myOrder` | 新 H5 WebView | 支持全部、待付款、待发货、待收货、已完成；搜索映射 `prodName`；接口失败/空数据不回退 mock |
-| `/orders/[orderNumber]` | 普通订单详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/detail` -> Java `/p/myOrder/orderDetail`、`/p/myDelivery/orderInfo/{orderNumber}` | 当前 WebView push | 首期覆盖普通快递订单；自提/虚拟/拼团专属详情后置；支持继续付款、取消、确认收货、删除、联系商家 |
-| `/refunds` | 退货退款列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refunds` -> Java `/p/orderRefund/list` | 新 H5 WebView | 独立售后页面，不作为 `/orders` tab；旧 `/orders?status=refund` 重定向到本页；接口失败/空数据不回退 mock |
-| `/refunds/[refundSn]` | 退款详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refund-detail` -> Java `/p/orderRefund/info` | 当前 WebView push | 从退货退款列表进入；首期只展示退款信息，不做撤销、平台介入、修改退款金额；旧 `/orders/refunds/[refundSn]` 兼容重定向 |
+| `/orders` | 订单列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders` -> Java `/p/myOrder/myOrder` | 新 H5 WebView | 支持全部、待付款、待发货、待收货、已完成；搜索映射 `prodName`；支持分页加载、继续付款前过期校验、取消、确认收货、删除、联系商家、查看物流；接口失败/空数据不回退 mock |
+| `/orders/[orderNumber]` | 普通订单详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/detail` -> Java `/p/myOrder/orderDetail`、`/p/myDelivery/orderInfo/{orderNumber}` | 当前 WebView push | 覆盖普通快递订单详情、物流摘要、地址、费用、订单信息、继续付款、取消、确认收货、删除、联系商家；支持整单退款、单品退款和查看退款；自提/虚拟/拼团专属详情后置 |
+| `/orders/logistics/[orderNumber]` | 订单物流详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/logistics` -> Java `/p/myDelivery/orderInfo/{orderNumber}`、`/p/myDelivery/deliveryOrder/{orderDeliveryId}`、`/p/myOrder/orderDetail` | 当前 WebView push | 支持多包裹切换、物流公司/单号、轨迹、订单商品展示 |
+| `/refunds` | 退货退款列表 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refunds` -> Java `/p/orderRefund/list` | 新 H5 WebView | 独立售后页面，不作为 `/orders` tab；旧 `/orders?status=refund` 重定向到本页；展示仅退款/退货退款、平台介入、退款状态和处理说明；支持分页；接口失败/空数据不回退 mock |
+| `/refunds/[refundSn]` | 退款详情 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refund-detail` -> Java `/p/orderRefund/info` | 当前 WebView push | 从退货退款列表进入；展示退款状态、进度、商品、原因说明、凭证、退货物流；支持撤销退款、撤销平台介入、修改退款金额、修改申请、填写/修改退货物流和平台介入/补充凭证；旧 `/orders/refunds/[refundSn]` 兼容重定向 |
+| `/refunds/choose-way` | 选择退款方式 | 已实现，待 App token 联调 | 使用 H5 `sessionStorage` 退款上下文 | 当前 WebView push | 已发货普通快递售后从订单详情进入，选择“仅退款/退货退款”后进入申请页 |
+| `/refunds/apply` | 申请/修改退款 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/refund-apply` -> Java `/p/orderRefund/apply`、`/p/orderRefund/update_refund` | 当前 WebView push/replace | 使用 `meumall_refund_context` 承接订单/商品/费用字段；提交 `applyType/isReceiver/buyerReason/goodsNum/refundAmount/buyerMobile/buyerDesc/photoFiles/refundType/orderItemId/giveawayItemIds` |
+| `/refunds/platform-intervention` | 平台介入/补充凭证 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/platform-intervention` -> Java `/p/orderRefund/apply_platform_intervention`、`/p/orderRefundIntervention/saveInterventionVoucher` | 当前 WebView push/replace | `pageType=1` 申请平台介入，`pageType=2` 补充凭证；本期图片上传使用已上传路径输入 |
+| `/refunds/return-logistics` | 填写/修改退货物流 | 已接真实 BFF，待 App token 联调 | BFF `/api/bff/orders/delivery-companies` -> `/p/delivery/list`；`/api/bff/orders/return-logistics` -> `/p/orderRefund/submitExpress`、`/p/orderRefund/reSubmitExpress` | 当前 WebView push/replace | 支持物流公司、单号、备注、凭证路径；`isModify=1` 回显退款详情中的退货物流 |
 | 原生 `settings` | 设置页 | App 原生承载 | App | native-page | H5 发送 `router/navigate route=settings` |
 
 ### 推广、达人与活动
@@ -153,6 +158,12 @@ draft，已按 2026-07-06 当前 H5-only 仓库边界、H5 实际路由、实现
 | `/api/bff/orders/delete` | 删除订单 | 已实现，待 App token 联调 | Java `/p/myOrder/{orderNumber}` | DELETE，参数来自当前订单号 |
 | `/api/bff/orders/contact-message` | 联系商家留言 | 已实现，待 App token 联调 | Java `/p/myOrder/submitMessage` | POST `orderNumber/userMobile/messageContent` |
 | `/api/bff/orders/refund-detail` | 退款详情 | 已实现，待 App token 联调 | Java `/p/orderRefund/info` | GET `refundSn` |
+| `/api/bff/orders/logistics` | 订单物流详情 | 已实现，待 App token 联调 | Java `/p/myDelivery/orderInfo/{orderNumber}`、`/p/myDelivery/deliveryOrder/{orderDeliveryId}`、`/p/myOrder/orderDetail` | GET `orderNumber`，可选 `deliveryId` |
+| `/api/bff/orders/refund-apply` | 申请/修改退款 | 已实现，待 App token 联调 | Java `/p/orderRefund/apply`、`/p/orderRefund/update_refund` | POST；有 `refundId` 时转修改申请 |
+| `/api/bff/orders/refund-actions` | 售后详情动作 | 已实现，待 App token 联调 | Java `/p/orderRefund/cancel`、`/p/orderRefund/updateRefundAmount`、`/p/orderRefund/cancel_platform_intervention` | PUT `action=cancel-refund/modify-amount/cancel-platform` |
+| `/api/bff/orders/platform-intervention` | 平台介入/补充凭证 | 已实现，待 App token 联调 | Java `/p/orderRefund/apply_platform_intervention`、`/p/orderRefundIntervention/saveInterventionVoucher` | POST `pageType=1/2` |
+| `/api/bff/orders/delivery-companies` | 物流公司列表 | 已实现，待 App token 联调 | Java `/p/delivery/list` | 退货物流页使用 |
+| `/api/bff/orders/return-logistics` | 填写/修改退货物流 | 已实现，待 App token 联调 | Java `/p/orderRefund/submitExpress`、`/p/orderRefund/reSubmitExpress` | POST `isModify` 分流 |
 | `/api/bff/favorites/products` | 我的收藏商品列表 | 已实现，待 App token 联调 | Java `/p/user/collection/prods` | 分页传 `current/size`；BFF 从 `records[0].products` 映射商品卡 |
 | `/api/bff/favorites/products/cancel` | 取消商品收藏 | 已实现，待 App token 联调 | Java `/p/user/collection/addOrCancel` | POST `{ prodId }`，BFF 转 Java 原始 `prodId` body |
 | `/api/bff/footprints` | 我的足迹列表 | 已实现，待 App token 联调 | Java `/p/prodBrowseLog/page` | 分页传 `current/size`；保留 `prodBrowseLogId` 供删除 |
